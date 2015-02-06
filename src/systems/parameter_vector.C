@@ -34,12 +34,14 @@ void ParameterVector::deep_copy(ParameterVector &target) const
 {
   const unsigned int Np = cast_int<unsigned int>
     (this->_params.size());
+  target.clear();
   target._params.resize(Np);
   target._my_data.resize(Np);
   for (unsigned int i=0; i != Np; ++i)
     {
-      target._params[i] = &target._my_data[i];
-      target._my_data[i] = *(this->_params[i]);
+      target._params[i] =
+        new ParameterPointer<Number>(&target._my_data[i]);
+      target._my_data[i] = *(*this)[i];
     }
 }
 
@@ -49,28 +51,32 @@ void ParameterVector::shallow_copy(ParameterVector &target) const
 {
   target._my_data.clear();
   target._params = this->_params;
+  target._is_shallow_copy = true;
 }
 
 
 
-void ParameterVector::value_copy(const ParameterVector &target) const
+void ParameterVector::value_copy(ParameterVector &target) const
 {
   const unsigned int Np = cast_int<unsigned int>
     (this->_params.size());
   libmesh_assert_equal_to (target._params.size(), Np);
 
   for (unsigned int i=0; i != Np; ++i)
-    *(this->_params[i]) = *(target._params[i]);
+    *target[i] = *(*this)[i];
 }
 
 
 
 void ParameterVector::deep_resize(unsigned int s)
 {
+  libmesh_assert(!_is_shallow_copy);
+
   this->_params.resize(s);
   this->_my_data.resize(s);
   for (unsigned int i=0; i != s; ++i)
-    this->_params[i] = &this->_my_data[i];
+    this->_params[i] =
+      new ParameterPointer<Number>(&this->_my_data[i]);
 }
 
 
@@ -80,27 +86,21 @@ ParameterVector& ParameterVector::operator *= (const Number a)
   const unsigned int Np = cast_int<unsigned int>
     (this->_params.size());
   for (unsigned int i=0; i != Np; ++i)
-    *(this->_params[i]) *= a;
+    *(*this)[i] *= a;
   return *this;
 }
 
 
 
-const ParameterVector& ParameterVector::operator += (const ParameterVector& a) const
+ParameterVector& ParameterVector::operator += (const ParameterVector& a)
 {
   const unsigned int Np = cast_int<unsigned int>
     (this->_params.size());
   libmesh_assert_equal_to (a._params.size(), Np);
   for (unsigned int i=0; i != Np; ++i)
-    *(this->_params[i]) += *(a._params[i]);
+    *(*this)[i] += *a[i];
   return *this;
 }
 
-
-ParameterVector& ParameterVector::operator += (const ParameterVector& a)
-{
-  (*this) += a;
-  return *this;
-}
 
 } // namespace libMesh
