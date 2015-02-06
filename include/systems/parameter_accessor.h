@@ -23,13 +23,17 @@
 
 // Local Includes -----------------------------------
 #include "libmesh/libmesh_common.h"
+#include "libmesh/compare_types.h" // remove_const
 
 namespace libMesh
 {
 
-// Forward declaration
+// Forward declarations
 template <typename T>
 class ParameterProxy;
+
+template <typename T>
+class ConstParameterProxy;
 
 
 /**
@@ -45,6 +49,12 @@ class ParameterAccessor
 {
 public:
   /**
+   * Virtual destructor - we'll be deleting subclasses from
+   * pointers-to-ParameterAccessor
+   */
+  virtual ~ParameterAccessor() {}
+
+  /**
    * Setter: change the value of the parameter we access.
    */
   virtual void set (const T & new_value) = 0;
@@ -52,14 +62,14 @@ public:
   /**
    * Getter: get the value of the parameter we access.
    */
-  virtual const T& get () = 0;
+  virtual const T& get () const = 0;
 
   /**
    * Reseater: change the location of the parameter we access.
    * This is included for backward compatibility, but will be
    * deprecated in some classes and not implemented in others.
    */
-  virtual void operator= (T * new_ptr)
+  virtual void operator= (T * /* new_ptr */)
     { libmesh_error(); }
 
   /**
@@ -71,6 +81,9 @@ public:
 
   ParameterProxy<T> operator* ()
     { return ParameterProxy<T>(*this); }
+
+  ConstParameterProxy<T> operator* () const
+    { return ConstParameterProxy<T>(*this); }
 };
 
 template <typename T=Number>
@@ -80,30 +93,85 @@ public:
   /**
    * Constructor: which parameter are we a proxy for?
    */
-  ParameterProxy(ParameterAccessor<T>& accessor) : _accessor(accessor) {}
+  ParameterProxy
+    (ParameterAccessor<T>& accessor)
+    : _accessor(accessor) {}
 
   /**
    * Setter: change the value of the parameter we access.
    */
   ParameterProxy& operator = (const T & new_value)
-    { _accessor.set(new_value); }
+    { _accessor.set(new_value); return *this; }
+
+  /**
+   * Setter: change the value of the parameter we access.
+   */
+  ParameterProxy& operator = (const ParameterProxy<T> & new_value)
+    { _accessor.set(new_value.get()); }
+
+  /**
+   * Setter: change the value of the parameter we access.
+   */
+  ParameterProxy& operator = (const ConstParameterProxy<T> & new_value)
+    { _accessor.set(new_value.get()); return *this; }
 
   /**
    * Setter: change the value of the parameter we access.
    */
   ParameterProxy& operator += (const T & value_increment)
-    { _accessor.set(_accessor.get() + value_increment); }
+    { _accessor.set(_accessor.get() + value_increment); return *this; }
 
   /**
    * Setter: change the value of the parameter we access.
    */
-  ParameterProxy& operator -= (const T & value_increment)
-    { _accessor.set(_accessor.get() - value_increment); }
+  ParameterProxy& operator -= (const T & value_decrement)
+    { _accessor.set(_accessor.get() - value_decrement); return *this; }
+
+  /**
+   * Setter: change the value of the parameter we access.
+   */
+  ParameterProxy& operator *= (const T & value_multiplier)
+    { _accessor.set(_accessor.get() * value_multiplier); return *this; }
+
+  /**
+   * Setter: change the value of the parameter we access.
+   */
+  ParameterProxy& operator /= (const T & value_divisor)
+    { _accessor.set(_accessor.get() / value_divisor); return *this; }
 
   /**
    * Getter: get the value of the parameter we access.
    */
-  operator T () { return _accessor.get(); }
+  operator T () const { return _accessor.get(); }
+
+private:
+  ParameterAccessor<T>& _accessor;
+};
+
+
+template <typename T=Number>
+class ConstParameterProxy
+{
+public:
+  /**
+   * Constructor: which parameter are we a proxy for?
+   */
+  ConstParameterProxy
+    (const ParameterAccessor<T>& accessor)
+    : _accessor(accessor) {}
+
+  /**
+   * Getter: get the value of the parameter we access.
+   */
+  operator T () const { return _accessor.get(); }
+
+  /**
+   * Getter: get the value of the parameter we access.
+   */
+  T get() const { return _accessor.get(); }
+
+private:
+  const ParameterAccessor<T>& _accessor;
 };
 
 

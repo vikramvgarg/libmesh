@@ -53,7 +53,7 @@ public:
   /**
    * Getter: get the value of the parameter we access.
    */
-  virtual const T& get ()
+  virtual const T& get () const
     { return *_ptr; }
 
   /**
