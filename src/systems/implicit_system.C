@@ -772,7 +772,9 @@ void ImplicitSystem::adjoint_qoi_parameter_sensitivity
       // (partial q / partial p) ~= (q(p+dp)-q(p-dp))/(2*dp)
       // (partial R / partial p) ~= (rhs(p+dp) - rhs(p-dp))/(2*dp)
 
-      Number old_parameter = *parameters[j];
+      ParameterAccessor<Number>* param_ptr = &(parameters[j]);
+      ParameterPointer<Number>* param_ptr_cast = dynamic_cast<ParameterPointer<Number>*>(param_ptr);
+      Number old_parameter = param_ptr_cast->get();
       // Number old_qoi = this->qoi;
 
       *parameters[j] = old_parameter - delta_p;

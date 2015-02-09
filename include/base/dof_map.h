@@ -1085,6 +1085,11 @@ public:
    */
   unsigned int sys_number() const;
 
+  /**
+   * @returns a reference to the DofConstraintValueMap object _primal_constraint_values
+   */
+  DofConstraintValueMap & get_primal_constraint_values();
+
 private:
 
   /**
@@ -1429,7 +1434,11 @@ unsigned int DofMap::sys_number() const
   return _sys_number;
 }
 
-
+inline
+DofConstraintValueMap & DofMap::get_primal_constraint_values()
+{
+  return _primal_constraint_values;
+}
 
 inline
 const VariableGroup & DofMap::variable_group (const unsigned int g) const
