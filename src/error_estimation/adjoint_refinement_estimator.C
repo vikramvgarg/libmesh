@@ -40,6 +40,8 @@
 #include "libmesh/partitioner.h"
 #include "libmesh/adjoint_refinement_estimator.h"
 
+#include "libmesh/fem_system.h"
+
 #include LIBMESH_INCLUDE_UNORDERED_MAP
 #include LIBMESH_INCLUDE_UNORDERED_SET
 
@@ -212,6 +214,11 @@ void AdjointRefinementEstimator::estimate_error (const System & _system,
 
   // Solve the adjoint problem(s) on the refined FE space
   system.adjoint_solve(_qoi_set);
+
+  // Hack
+  // Now call element_postprocess to compute custom error estimates
+  (dynamic_cast<FEMSystem &>(system)).postprocess();
+  // End Hack
 
   // Now that we have the refined adjoint solution and the projected primal solution,
   // we first compute the global QoI error estimate
