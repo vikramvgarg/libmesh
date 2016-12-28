@@ -217,6 +217,7 @@ void AdjointRefinementEstimator::estimate_error (const System & _system,
 
   // Hack
   // Now call element_postprocess to compute custom error estimates
+  (dynamic_cast<FEMSystem &>(system)).postprocess_sides = true;
   (dynamic_cast<FEMSystem &>(system)).postprocess();
   // End Hack
 
