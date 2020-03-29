@@ -33,6 +33,7 @@ public:
 
   unsigned int initial_timestep, n_timesteps;
   bool transient;
+  std::string solutionhistorytype;
   unsigned int deltat_reductions;
   std::string timesolver_core;
   libMesh::Real end_time, deltat, timesolver_theta,
