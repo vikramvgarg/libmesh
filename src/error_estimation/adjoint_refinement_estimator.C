@@ -274,7 +274,7 @@ void AdjointRefinementEstimator::estimate_error (const System & _system,
         }
 #endif // NDEBUG
 
-  // Uniformly refine the mesh
+  // A mesh refinement object to handle uniform refinements if needed
   MeshRefinement mesh_refinement(mesh);
 
   // We only need to worry about Galerkin orthogonality if we
