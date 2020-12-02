@@ -1,0 +1,109 @@
+// The libMesh Finite Element Library.
+// Copyright (C) 2002-2020 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
+
+// This library is free software; you can redistribute it and/or
+// modify it under the terms of the GNU Lesser General Public
+// License as published by the Free Software Foundation; either
+// version 2.1 of the License, or (at your option) any later version.
+
+// This library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+// Lesser General Public License for more details.
+
+// You should have received a copy of the GNU Lesser General Public
+// License along with this library; if not, write to the Free Software
+// Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+
+
+#ifndef LIBMESH_MEMORY_MESH_HISTORY_H
+#define LIBMESH_MEMORY_MESH_HISTORY_H
+
+// Local includes
+#include "libmesh/numeric_vector.h"
+#include "libmesh/solution_history.h"
+#include "libmesh/auto_ptr.h" // libmesh_make_unique
+#include "libmesh/mesh_base.h"
+
+// C++ includes
+#include <list>
+
+namespace libMesh
+{
+
+/**
+ * Subclass of MeshHistory that stores meshes in memory.
+ *
+ * \author Vikram Garg
+ * \date 2020
+ * \brief Stores past meshes in memory.
+ */
+class MemoryMeshHistory : public MeshHistory
+{
+public:
+
+  /**
+   * Constructor, reference to system to be passed by user, set the
+   * stored_sols iterator to some initial value
+   */
+  MemoryMeshHistory(System & system_);
+
+  /**
+   * Destructor
+   */
+  ~MemoryMeshHistory();
+
+  /**
+   * Virtual function store which we will be overriding to store timesteps
+   */
+  virtual void store(bool is_adjoint_solve, Real time) override;
+
+  /**
+   * Virtual function retrieve which we will be overriding to retrieve timesteps
+   */
+  virtual void retrieve(bool is_adjoint_solve, Real time) override;
+
+  /**
+   * Virtual function retrieve which we will be overriding to erase timesteps
+   */
+  virtual void erase(Real time) override;
+
+  /**
+   * Typedef for Stored Solutions iterator, a list of pairs of the current
+   * system time and stored meshes as unique pointers
+   */
+  typedef std::map<Real, std::unique_ptr<MeshBase>> map_type;
+  typedef map_type::iterator stored_meshes_iterator;
+
+  /**
+   * Definition of the clone function needed for the setter function
+   */
+  virtual std::unique_ptr<MeshHistory> clone() const override
+  {
+    return libmesh_make_unique<MemoryMeshHistory>(_system);
+  }
+
+private:
+
+  // This list of pairs will hold the timestamp and filename of each stored mesh
+  map_type stored_meshes;
+
+  // The stored meshes iterator
+  stored_meshes_iterator stored_meshes_it;
+
+  // A helper function to locate entries at a given time
+  // Behaviour depends on whether we are calling this function
+  // while storing or retrieving/erasing entries.
+  // While storing, if no entry in our map matches our time key,
+  // we will create a new entry in the map. If we are not storing,
+  // not matching a given time key implies an error.
+  void find_stored_entry(Real time, bool storing = false);
+
+  // A system reference
+  System & _system ;
+};
+
+} // end namespace libMesh
+
+#endif // LIBMESH_MEMORY_MESH_HISTORY_H
