@@ -90,6 +90,12 @@ public:
   { return libmesh_make_unique<DistributedMesh>(*this); }
 
   /**
+   * Assignment function, will move argument onto the MeshBase object.
+   * Definition in derived classes.
+   */
+  virtual void assign (MeshBase & other_mesh) override;
+
+  /**
    * Destructor.
    */
   virtual ~DistributedMesh();
@@ -233,6 +239,12 @@ public:
   virtual dof_id_type n_active_elem () const override;
   virtual dof_id_type max_elem_id () const override { return _max_elem_id; }
   virtual void reserve_elem (const dof_id_type) override {}
+
+  // Accessors for dof_id_type variables specific to this class
+  dof_id_type next_free_local_node_id(){return _next_free_local_node_id;}
+  dof_id_type next_free_local_elem_id(){return _next_free_local_elem_id;}
+  dof_id_type next_free_unpartitioned_node_id(){return _next_free_unpartitioned_node_id;}
+  dof_id_type next_free_unpartitioned_elem_id(){return _next_free_unpartitioned_elem_id;}
 
   // Parallel only method to update the caches
   virtual void update_parallel_id_counts () override;
