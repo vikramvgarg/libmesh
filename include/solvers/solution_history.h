@@ -20,6 +20,7 @@
 
 // Local Includes
 #include "libmesh/system.h"
+#include "libmesh/no_mesh_history.h"
 
 namespace libMesh
 {
@@ -40,7 +41,9 @@ public:
    * Constructor
    */
   SolutionHistory() :
-    overwrite_previously_stored(false) {}
+    overwrite_previously_stored(false),
+    mesh_history(libmesh_make_unique<NoMeshHistory>())
+    {}
 
   /**
    * Destructor
@@ -75,11 +78,28 @@ public:
   void set_overwrite_previously_stored (bool val)
   { overwrite_previously_stored = val; }
 
+  /**
+   * In derived class implementations, will initialize the mesh_history
+   * to mimic the type of the derived SolutionHistory.
+   * We will start storing and retrieving the mesh along with the solutions.
+   * It is necessary to save the mesh, if we plan to do uniform
+   * or adaptive mesh refinement in the time integration loop.
+   */
+  virtual void activate_mesh_history(unsigned int number_h_refinements = 0, unsigned int number_p_refinements = 0) = 0;
+
 protected:
 
   // Flag to specify whether we want to overwrite previously stored
   // vectors at a given time or not
   bool overwrite_previously_stored;
+
+  /**
+   * A MeshHistory object, which can be used for storing and retrieving the mesh for a timestep.
+   * By default, this is of the type NoMeshHistory, which does no storage or retrieval.
+   * The user can set instead initialize this object as a FileMeshHistory or MemoryMeshHistory
+   * object via an accessor and manage I/O for the mesh.
+   */
+  std::unique_ptr<MeshHistory> mesh_history;
 };
 
 } // end namespace libMesh
