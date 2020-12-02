@@ -72,6 +72,7 @@ namespace libMesh
 
 AdjointRefinementEstimator::AdjointRefinementEstimator() :
   ErrorEstimator(),
+  fine_adjoint_solved(false),
   number_h_refinements(1),
   number_p_refinements(0),
   _residual_evaluation_physics(nullptr),
@@ -274,14 +275,16 @@ void AdjointRefinementEstimator::estimate_error (const System & _system,
         }
 #endif // NDEBUG
 
-  // Uniformly refine the mesh
+  // A MeshRefinement object to manage h and/or p refinements.
   MeshRefinement mesh_refinement(mesh);
 
   // We only need to worry about Galerkin orthogonality if we
   // are estimating discretization error in a single model setting
+  // Another scenario is unsteady adjoint error estimation, where
+  // we have already solved the adjoint on a finer grid in a separate loop.
   {
     const bool swapping_adjoint_physics = _adjoint_evaluation_physics;
-    if(!swapping_adjoint_physics)
+    if(!swapping_adjoint_physics && !fine_adjoint_solved)
       libmesh_assert (number_h_refinements > 0 || number_p_refinements > 0);
   }
 
@@ -349,8 +352,10 @@ void AdjointRefinementEstimator::estimate_error (const System & _system,
   // Solve the adjoint problem(s) on the refined FE space
   // The matrix will be reassembled again because we have refined the mesh
   // If we have no h or p refinements, no need to solve for a fine adjoint
-  if(number_h_refinements > 0 || number_p_refinements > 0)
-    (dynamic_cast<ImplicitSystem &>(system)).adjoint_solve(_qoi_set);
+  // Also, if we have previously solved the adjoint on a fine grid, no need to solve it
+  if(!fine_adjoint_solved)
+    if(number_h_refinements > 0 || number_p_refinements > 0)
+      (dynamic_cast<ImplicitSystem &>(system)).adjoint_solve(_qoi_set);
 
   // Swap back if needed, recall that _adjoint_evaluation_physics now holds the pointer
   // to the pre-swap physics
@@ -609,7 +614,9 @@ void AdjointRefinementEstimator::estimate_error (const System & _system,
   // Uniformly coarsen the mesh, without projecting the solution
   // Only need to do this if we are estimating discretization error
   // with a single physics residual
-  if(!swapping_adjoint_physics)
+  // Another scenario is unsteady adjoint error estimation, where
+  // we have already solved the adjoint on a finer grid in a separate loop.
+  if(!swapping_adjoint_physics && !fine_adjoint_solved)
     libmesh_assert (number_h_refinements > 0 || number_p_refinements > 0);
 
   for (unsigned int i = 0; i != number_h_refinements; ++i)
