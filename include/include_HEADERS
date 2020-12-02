@@ -1,4 +1,4 @@
-# Do not edit - automatically generated from ./rebuild_include_HEADERS.sh
+# Do not edit - automatically generated from rebuild_include_HEADERS.sh
 # These are headers we need to compile the libMesh library but should
 # not be installed.  These header files may have implementation
 # details which are not required for the public interface
@@ -357,13 +357,17 @@ include_HEADERS =  \
         solvers/eigen_time_solver.h \
         solvers/euler2_solver.h \
         solvers/euler_solver.h \
+        solvers/file_mesh_history.h \
         solvers/file_solution_history.h \
         solvers/first_order_unsteady_solver.h \
         solvers/linear_solver.h \
+        solvers/memory_mesh_history.h \
         solvers/memory_solution_history.h \
+        solvers/mesh_history.h \
         solvers/newmark_solver.h \
         solvers/newton_solver.h \
         solvers/nlopt_optimization_solver.h \
+        solvers/no_mesh_history.h \
         solvers/no_solution_history.h \
         solvers/nonlinear_solver.h \
         solvers/optimization_solver.h \
