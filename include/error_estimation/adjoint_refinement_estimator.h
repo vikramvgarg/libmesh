@@ -111,6 +111,11 @@ public:
   virtual ErrorEstimatorType type() const;
 
   /**
+   * Have we solved the adjoint on a fine mesh ?
+   */
+  bool fine_adjoint_solved;
+
+  /**
    * How many h refinements to perform to get the fine grid
    */
   unsigned char number_h_refinements;
