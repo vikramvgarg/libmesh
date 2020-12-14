@@ -77,7 +77,9 @@ namespace libMesh
         {mesh_function = _mesh_function;}
 
         // Destructor
-        virtual ~GradientFunction () {}
+        virtual ~GradientFunction () { }
+
+        virtual void init () { mesh_function->init(); }
 
         virtual std::unique_ptr<FunctionBase<Gradient>> clone () const
         {
@@ -88,10 +90,7 @@ namespace libMesh
                              const Real)
         { libmesh_not_implemented(); }
 
-        virtual void operator() (const Point & p,
-                             const Real,
-                             DenseVector<Gradient> & output)
-        { Real time = 0.0; mesh_function->gradient(p, time, dynamic_cast<std::vector<Gradient> &>(output)); return;}
+        virtual void operator() (const Point & p, const Real, DenseVector<Gradient> & output);
 
         private:
         MeshFunction * mesh_function;
