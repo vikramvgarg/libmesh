@@ -24,6 +24,7 @@
 #include "libmesh/libmesh.h"
 #include "libmesh/mesh.h"
 #include "libmesh/system.h"
+#include "libmesh/equation_systems.h"
 #include "libmesh/mesh_function.h"
 #include "libmesh/numeric_vector.h"
 #include "libmesh/numeric_vector.h"
@@ -73,8 +74,7 @@ namespace libMesh
     {
         public:
         // Constructor
-        GradientFunction(MeshFunction * _mesh_function)
-        {mesh_function = _mesh_function;}
+        GradientFunction(MeshFunction * _mesh_function);
 
         // Destructor
         virtual ~GradientFunction () { }
@@ -83,17 +83,16 @@ namespace libMesh
 
         virtual std::unique_ptr<FunctionBase<Gradient>> clone () const
         {
-            return libmesh_make_unique<GradientFunction>(*this);
+          return libmesh_make_unique<GradientFunction>(dynamic_cast<MeshFunction *>(mesh_function.get()));
         }
 
-        virtual Gradient operator() (const Point & ,
-                             const Real)
+        virtual Gradient operator() (const Point & , const Real)
         { libmesh_not_implemented(); }
 
         virtual void operator() (const Point & p, const Real, DenseVector<Gradient> & output);
 
         private:
-        MeshFunction * mesh_function;
+        std::unique_ptr<FunctionBase<Number>> mesh_function;
 
     };
 }
