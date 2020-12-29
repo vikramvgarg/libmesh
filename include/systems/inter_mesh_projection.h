@@ -97,7 +97,7 @@ namespace libMesh
 
         private:
 
-	    // Local copy of the passed in mesh function.
+        // Local copy of the passed in mesh function.
         std::unique_ptr<FunctionBase<Number>> mesh_function;
 
     };
