@@ -56,7 +56,7 @@ namespace libMesh
 
         // We are going to use the multi-variable MeshFunction, so we can pass
         // a single vector of variables rather than have a MeshFunction for each variable
-	    std::vector<unsigned int> variables_vector;
+        std::vector<unsigned int> variables_vector;
 
         for (unsigned int j = 0; j != n_vars; ++j)
         {
@@ -67,9 +67,9 @@ namespace libMesh
         // We will first project the solution and then move to the system.vectors
 
         // Construct local version of the current system vector
-	    // This has to be a serial vector
+        // This has to be a serial vector
         std::unique_ptr<NumericVector<Number>> solution_vector_serial = NumericVector<Number>::build(from_system.comm());
-	    solution_vector_serial->init(from_system.solution->size(), true, SERIAL);
+        solution_vector_serial->init(from_system.solution->size(), true, SERIAL);
 
         std::vector<Number> solution_vector;
         from_system.update_global_solution(solution_vector);
@@ -95,15 +95,15 @@ namespace libMesh
         delete gptr_solution;
 
         // Now loop over the vectors in system.vectors (includes old_nonlin_sol, rhs, adjoints, adjoint_rhs, sensitivity_rhs)
-    	for (System::vectors_iterator vec = from_system.vectors_begin(), vec_end = from_system.vectors_end(); vec != vec_end; ++vec)
-	    {
+        for (System::vectors_iterator vec = from_system.vectors_begin(), vec_end = from_system.vectors_end(); vec != vec_end; ++vec)
+        {
             // The name of this vector
-	        const std::string & vec_name = vec->first;
+            const std::string & vec_name = vec->first;
 
             // Construct local version of the current system vector
-	        // This has to be a serial vector
+            // This has to be a serial vector
             std::unique_ptr<NumericVector<Number>> current_vector_proxy = NumericVector<Number>::build(from_system.comm());
-	        current_vector_proxy->init(from_system.get_vector(vec_name).size(), true, SERIAL);
+            current_vector_proxy->init(from_system.get_vector(vec_name).size(), true, SERIAL);
 
             from_system.get_vector(vec_name).localize(*current_vector_proxy);
 
