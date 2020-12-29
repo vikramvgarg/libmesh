@@ -42,7 +42,7 @@ namespace libMesh
     /**
      * This class implements inter mesh projection, i.e. projection of
      * vectors defined on a given mesh (from_mesh associated with from_system)
-     * to another mesh (to_mesh), stored in the map projected_vectors_map.
+     * to another mesh (to_mesh of to_system).
      */
 
     class InterMeshProjection
@@ -70,20 +70,24 @@ namespace libMesh
 
     };
 
-    class GradientFunction : public FunctionBase<Gradient>
+    // This class provides the functor we will supply to System::project_vector
+    // inside InterMeshProjection::project_system_vectors.
+    // Object is constructed by passing in a pointer to the mesh function whose
+    // gradient we want to shim via operator().
+    class GradientMeshFunction : public FunctionBase<Gradient>
     {
         public:
         // Constructor
-        GradientFunction(MeshFunction * _mesh_function);
+        GradientMeshFunction(MeshFunction * _mesh_function);
 
         // Destructor
-        virtual ~GradientFunction () { }
+        virtual ~GradientMeshFunction () { }
 
         virtual void init () { mesh_function->init(); }
 
         virtual std::unique_ptr<FunctionBase<Gradient>> clone () const
         {
-          return libmesh_make_unique<GradientFunction>(dynamic_cast<MeshFunction *>(mesh_function.get()));
+          return libmesh_make_unique<GradientMeshFunction>(dynamic_cast<MeshFunction *>(mesh_function.get()));
         }
 
         virtual Gradient operator() (const Point & , const Real)
@@ -92,6 +96,8 @@ namespace libMesh
         virtual void operator() (const Point & p, const Real, DenseVector<Gradient> & output);
 
         private:
+
+	    // Local copy of the passed in mesh function.
         std::unique_ptr<FunctionBase<Number>> mesh_function;
 
     };
