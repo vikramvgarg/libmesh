@@ -265,10 +265,29 @@ void FileMeshHistory::retrieve(bool is_adjoint_solve, Real time)
       return;
     }
 
+    // // At this point, we could replaced the old mesh with the new read in mesh, but then we wont be able to call es.reinit() to project
+    // // vectors, since the projections there are meant to be performed between different refinement levels
+    // // of the same mesh.
+    // // Instead we will use an InterMeshProjection object and a System _projection_system object
+    // // to project our vectors from the old mesh to the new one being read in.
+    // // Then, we can clear the old mesh, read in the new one and replace
+    // // vectors in _system with those from _projection_system and carry on.
+    // Mesh destination_mesh (init.comm(), param.dimension);
+    // destination_mesh.read(stored_meshes_it->second);
+    // EquationSystems destination_equation_systems (destination_mesh);
+    // System &destination_system = destination_equation_systems.add_system<System> ("DestinationHeatSystem");
+    // // Add all the variables from _system to destination_system
+    // // Add all the vectors from _system to destination_system
+    // InterMeshProjection inter_mesh_projector(_system , destination_system);
+    // inter_mesh_projector.project_vectors();
+
     // Read in the mesh at this time instant and reinit to project solutions on to the new mesh
     _system.get_mesh().clear();
     _system.get_mesh().read(stored_meshes_it->second);
-    _system.get_equation_systems().reinit();
+
+    // Replace the vectors in _system with those from destination_system
+
+    //_system.get_equation_systems().reinit();
 
     // We need to call update to put system in a consistent state
     // with the mesh that was read in
