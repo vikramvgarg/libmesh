@@ -56,8 +56,7 @@ class RBConstructionBase : public Base, public RBParametrized
 public:
 
   /**
-   * Constructor.  Initializes required
-   * data structures.
+   * Constructor.
    */
   RBConstructionBase (EquationSystems & es,
                       const std::string & name,
@@ -65,11 +64,13 @@ public:
 
   /**
    * Special functions.
-   * - This class contains a unique_ptr so it can't be copy assigned/constructed.
+   * - This class has the same restrictions as the union of its
+   *   potential base classes (currently LinearImplicitSystem and
+   *   EigenSystem).
    * - Destructor is defaulted out-of-line.
    */
   RBConstructionBase (RBConstructionBase &&) = default;
-  RBConstructionBase & operator= (RBConstructionBase &&) = default;
+  RBConstructionBase & operator= (RBConstructionBase &&) = delete;
   RBConstructionBase (const RBConstructionBase &) = delete;
   RBConstructionBase & operator= (const RBConstructionBase &) = delete;
   virtual ~RBConstructionBase ();
@@ -177,14 +178,28 @@ public:
   const std::string & get_deterministic_training_parameter_name() const;
 
   /**
-   * Set the number of times each sample of the deterministic training parameter is repeated.
+   * Static helper function for generating a randomized set of parameters.
    */
-  void set_deterministic_training_parameter_repeats(unsigned int repeats);
+  static void generate_training_parameters_random(const Parallel::Communicator & communicator,
+                                                  std::map<std::string, bool> log_param_scale,
+                                                  std::map<std::string, std::unique_ptr<NumericVector<Number>>> & training_parameters_in,
+                                                  unsigned int n_training_samples_in,
+                                                  const RBParameters & min_parameters,
+                                                  const RBParameters & max_parameters,
+                                                  int training_parameters_random_seed=-1,
+                                                  bool serial_training_set=false);
 
   /**
-   * Get the number of times each sample of the deterministic training parameter is repeated.
+   * Static helper function for generating a deterministic set of parameters. Only works with 1 or 2
+   * parameters (as defined by the lengths of min/max parameters vectors), otherwise throws an error.
    */
-  unsigned int get_deterministic_training_parameter_repeats() const;
+  static void generate_training_parameters_deterministic(const Parallel::Communicator & communicator,
+                                                         std::map<std::string, bool> log_param_scale,
+                                                         std::map<std::string, std::unique_ptr<NumericVector<Number>>> & training_parameters_in,
+                                                         unsigned int n_training_samples_in,
+                                                         const RBParameters & min_parameters,
+                                                         const RBParameters & max_parameters,
+                                                         bool serial_training_set=false);
 
 protected:
 
@@ -216,30 +231,6 @@ protected:
    */
   static void get_global_max_error_pair(const Parallel::Communicator & communicator,
                                         std::pair<numeric_index_type, Real> & error_pair);
-
-  /**
-   * Static helper function for generating a randomized set of parameters.
-   */
-  static void generate_training_parameters_random(const Parallel::Communicator & communicator,
-                                                  std::map<std::string, bool> log_param_scale,
-                                                  std::map<std::string, std::unique_ptr<NumericVector<Number>>> & training_parameters_in,
-                                                  unsigned int n_training_samples_in,
-                                                  const RBParameters & min_parameters,
-                                                  const RBParameters & max_parameters,
-                                                  int training_parameters_random_seed=-1,
-                                                  bool serial_training_set=false);
-
-  /**
-   * Static helper function for generating a deterministic set of parameters. Only works with 1 or 2
-   * parameters (as defined by the lengths of min/max parameters vectors), otherwise throws an error.
-   */
-  static void generate_training_parameters_deterministic(const Parallel::Communicator & communicator,
-                                                         std::map<std::string, bool> log_param_scale,
-                                                         std::map<std::string, std::unique_ptr<NumericVector<Number>>> & training_parameters_in,
-                                                         unsigned int n_training_samples_in,
-                                                         const RBParameters & min_parameters,
-                                                         const RBParameters & max_parameters,
-                                                         bool serial_training_set=false);
 
 
   //----------- PROTECTED DATA MEMBERS -----------//

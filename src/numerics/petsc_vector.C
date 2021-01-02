@@ -15,31 +15,75 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-
-
-// C++ includes
-#include <numeric> // std::iota
-
-// Local Includes
 #include "libmesh/petsc_vector.h"
-
-// libMesh includes
-#include "libmesh/petsc_matrix.h"
 
 #ifdef LIBMESH_HAVE_PETSC
 
+// libMesh includes
+#include "libmesh/petsc_matrix.h"
 #include "libmesh/dense_subvector.h"
 #include "libmesh/dense_vector.h"
 #include "libmesh/int_range.h"
 #include "libmesh/petsc_macro.h"
+#include "libmesh/wrapped_petsc.h"
 
 // TIMPI includes
 #include "timpi/op_function.h"
 #include "timpi/parallel_implementation.h"
 #include "timpi/standard_type.h"
 
+// C++ includes
+#include <numeric> // std::iota
+
 namespace libMesh
 {
+
+/**
+ * RAII struct which calls VecGhostGetLocalForm() in its constructor
+ * and VecGhostRestoreLocalForm() in its destructor. Provides public
+ * access to the resulting "local form" via the public "local_form"
+ * member.
+ */
+template <typename T>
+struct VecGhostLocalFormRAII
+{
+  /**
+   * Constructor. If enabled, calls VecGhostGetLocalForm(), otherwise
+   * just treats the Vec itself as the local form.
+   *
+   * Note that we are "abusing" the const PetscVector's ability
+   * to return a non-const Vec object via the vec() member. This is because
+   * there is currently no way to indicate to PETSc that a local form will be
+   * used in a read-only manner.
+   */
+  VecGhostLocalFormRAII(const PetscVector<T> & vec_in, bool enabled_in)
+    : vec(vec_in),
+      enabled(enabled_in)
+  {
+    if (enabled)
+      {
+        PetscErrorCode ierr = VecGhostGetLocalForm (vec.vec(), &local_form);
+        LIBMESH_CHKERR2(vec.comm(), ierr);
+      }
+    else
+      local_form = vec.vec();
+  }
+
+  /**
+   * Destructor. Calls VecGhostRestoreLocalForm() only if enabled.
+   * Does not check error messages since we should not throw from
+   * destructors in general.
+   */
+  ~VecGhostLocalFormRAII()
+  {
+    if (enabled)
+      VecGhostRestoreLocalForm (vec.vec(), &local_form);
+  }
+
+  const PetscVector<T> & vec;
+  bool enabled;
+  Vec local_form;
+};
 
 //-----------------------------------------------------------------------
 // PetscVector members
@@ -337,7 +381,6 @@ void PetscVector<T>::add (const T a_in, const NumericVector<T> & v_in)
 {
   this->_restore_array();
 
-  PetscErrorCode ierr = 0;
   PetscScalar a = PS(a_in);
 
   // Make sure the NumericVector passed in is really a PetscVector
@@ -346,28 +389,10 @@ void PetscVector<T>::add (const T a_in, const NumericVector<T> & v_in)
 
   libmesh_assert_equal_to (this->size(), v->size());
 
-  if (this->type() != GHOSTED)
-    {
-      ierr = VecAXPY(_vec, a, v->_vec);
-      LIBMESH_CHKERR(ierr);
-    }
-  else
-    {
-      Vec loc_vec;
-      Vec v_loc_vec;
-      ierr = VecGhostGetLocalForm (_vec,&loc_vec);
-      LIBMESH_CHKERR(ierr);
-      ierr = VecGhostGetLocalForm (v->_vec,&v_loc_vec);
-      LIBMESH_CHKERR(ierr);
-
-      ierr = VecAXPY(loc_vec, a, v_loc_vec);
-      LIBMESH_CHKERR(ierr);
-
-      ierr = VecGhostRestoreLocalForm (v->_vec,&v_loc_vec);
-      LIBMESH_CHKERR(ierr);
-      ierr = VecGhostRestoreLocalForm (_vec,&loc_vec);
-      LIBMESH_CHKERR(ierr);
-    }
+  VecGhostLocalFormRAII<T> ghost(*this, this->type() == GHOSTED);
+  VecGhostLocalFormRAII<T> v_ghost(*v, this->type() == GHOSTED);
+  PetscErrorCode ierr = VecAXPY(ghost.local_form, a, v_ghost.local_form);
+  LIBMESH_CHKERR(ierr);
 }
 
 
@@ -397,26 +422,11 @@ void PetscVector<T>::scale (const T factor_in)
 {
   this->_restore_array();
 
-  PetscErrorCode ierr = 0;
   PetscScalar factor = PS(factor_in);
 
-  if (this->type() != GHOSTED)
-    {
-      ierr = VecScale(_vec, factor);
-      LIBMESH_CHKERR(ierr);
-    }
-  else
-    {
-      Vec loc_vec;
-      ierr = VecGhostGetLocalForm (_vec,&loc_vec);
-      LIBMESH_CHKERR(ierr);
-
-      ierr = VecScale(loc_vec, factor);
-      LIBMESH_CHKERR(ierr);
-
-      ierr = VecGhostRestoreLocalForm (_vec,&loc_vec);
-      LIBMESH_CHKERR(ierr);
-    }
+  VecGhostLocalFormRAII<T> ghost(*this, this->type() == GHOSTED);
+  PetscErrorCode ierr = VecScale(ghost.local_form, factor);
+  LIBMESH_CHKERR(ierr);
 }
 
 template <typename T>
@@ -450,25 +460,9 @@ void PetscVector<T>::abs()
 {
   this->_restore_array();
 
-  PetscErrorCode ierr = 0;
-
-  if (this->type() != GHOSTED)
-    {
-      ierr = VecAbs(_vec);
-      LIBMESH_CHKERR(ierr);
-    }
-  else
-    {
-      Vec loc_vec;
-      ierr = VecGhostGetLocalForm (_vec,&loc_vec);
-      LIBMESH_CHKERR(ierr);
-
-      ierr = VecAbs(loc_vec);
-      LIBMESH_CHKERR(ierr);
-
-      ierr = VecGhostRestoreLocalForm (_vec,&loc_vec);
-      LIBMESH_CHKERR(ierr);
-    }
+  VecGhostLocalFormRAII<T> ghost(*this, this->type() == GHOSTED);
+  PetscErrorCode ierr = VecAbs(ghost.local_form);
+  LIBMESH_CHKERR(ierr);
 }
 
 template <typename T>
@@ -521,28 +515,13 @@ PetscVector<T>::operator = (const T s_in)
   this->_restore_array();
   libmesh_assert(this->closed());
 
-  PetscErrorCode ierr = 0;
   PetscScalar s = PS(s_in);
 
   if (this->size() != 0)
     {
-      if (this->type() != GHOSTED)
-        {
-          ierr = VecSet(_vec, s);
-          LIBMESH_CHKERR(ierr);
-        }
-      else
-        {
-          Vec loc_vec;
-          ierr = VecGhostGetLocalForm (_vec,&loc_vec);
-          LIBMESH_CHKERR(ierr);
-
-          ierr = VecSet(loc_vec, s);
-          LIBMESH_CHKERR(ierr);
-
-          ierr = VecGhostRestoreLocalForm (_vec,&loc_vec);
-          LIBMESH_CHKERR(ierr);
-        }
+      VecGhostLocalFormRAII<T> ghost(*this, this->type() == GHOSTED);
+      PetscErrorCode ierr = VecSet(ghost.local_form, s);
+      LIBMESH_CHKERR(ierr);
     }
 
   return *this;
@@ -582,42 +561,24 @@ PetscVector<T>::operator = (const PetscVector<T> & v)
       ((this->type()==GHOSTED) && (v.type()==SERIAL))   ||
       ((this->type()==SERIAL) && (v.type()==GHOSTED)))
     {
-      /* Allow assignment of a ghosted to a parallel vector since this
-         causes no difficulty.  See discussion in libmesh-devel of
-         June 24, 2010.  */
+      // Allow assignment of a ghosted to a parallel vector since this
+      // causes no difficulty.  See discussion in libmesh-devel of
+      // June 24, 2010.
       ierr = VecCopy (v._vec, this->_vec);
       LIBMESH_CHKERR(ierr);
     }
   else
     {
-      /* In all other cases, we assert that both vectors are of equal
-         type.  */
+      // In all other cases, we assert that both vectors are of equal
+      // type.
       libmesh_assert_equal_to (this->_type, v._type);
 
       if (v.size() != 0)
         {
-          if (this->type() != GHOSTED)
-            {
-              ierr = VecCopy (v._vec, this->_vec);
-              LIBMESH_CHKERR(ierr);
-            }
-          else
-            {
-              Vec loc_vec;
-              Vec v_loc_vec;
-              ierr = VecGhostGetLocalForm (_vec,&loc_vec);
-              LIBMESH_CHKERR(ierr);
-              ierr = VecGhostGetLocalForm (v._vec,&v_loc_vec);
-              LIBMESH_CHKERR(ierr);
-
-              ierr = VecCopy (v_loc_vec, loc_vec);
-              LIBMESH_CHKERR(ierr);
-
-              ierr = VecGhostRestoreLocalForm (v._vec,&v_loc_vec);
-              LIBMESH_CHKERR(ierr);
-              ierr = VecGhostRestoreLocalForm (_vec,&loc_vec);
-              LIBMESH_CHKERR(ierr);
-            }
+          VecGhostLocalFormRAII<T> ghost(*this, this->type() == GHOSTED);
+          VecGhostLocalFormRAII<T> v_ghost(v, this->type() == GHOSTED);
+          ierr = VecCopy (v_ghost.local_form, ghost.local_form);
+          LIBMESH_CHKERR(ierr);
         }
     }
 
@@ -687,16 +648,10 @@ void PetscVector<T>::localize (NumericVector<T> & v_local_in) const
 
   if (v_local->type() == SERIAL && this->size() == v_local->local_size())
   {
-    VecScatter scatter;
-
-    ierr = VecScatterCreateToAll(_vec,&scatter,NULL);
+    WrappedPetsc<VecScatter> scatter;
+    ierr = VecScatterCreateToAll(_vec, scatter.get(), nullptr);
     LIBMESH_CHKERR(ierr);
-    ierr = VecScatterBegin(scatter,_vec,v_local->_vec,INSERT_VALUES,SCATTER_FORWARD);
-    LIBMESH_CHKERR(ierr);
-    ierr = VecScatterEnd(scatter,_vec,v_local->_vec,INSERT_VALUES,SCATTER_FORWARD);
-    LIBMESH_CHKERR(ierr);
-    ierr = VecScatterDestroy(&scatter);
-    LIBMESH_CHKERR(ierr);
+    VecScatterBeginEnd(this->comm(), scatter, _vec, v_local->_vec, INSERT_VALUES, SCATTER_FORWARD);
   }
   // Two vectors have the same size, and we should just do a simple copy.
   // v_local could be either a parallel or ghosted vector
@@ -711,14 +666,9 @@ void PetscVector<T>::localize (NumericVector<T> & v_local_in) const
   }
 
   // Make sure ghost dofs are up to date
+  // We do not call "close" here to save a global reduction
   if (v_local->type() == GHOSTED)
-  {
-    // We do not call "close" here to save a global reduction
-    ierr = VecGhostUpdateBegin(v_local->_vec,INSERT_VALUES,SCATTER_FORWARD);
-    LIBMESH_CHKERR(ierr);
-    ierr = VecGhostUpdateEnd(v_local->_vec,INSERT_VALUES,SCATTER_FORWARD);
-    LIBMESH_CHKERR(ierr);
-  }
+    VecGhostUpdateBeginEnd(this->comm(), v_local->_vec, INSERT_VALUES, SCATTER_FORWARD);
 }
 
 
@@ -752,43 +702,28 @@ void PetscVector<T>::localize (NumericVector<T> & v_local_in,
   const numeric_index_type n_sl =
     cast_int<numeric_index_type>(send_list.size());
 
-  IS is;
-  VecScatter scatter;
-
   std::vector<PetscInt> idx(n_sl + this->local_size());
-
   for (numeric_index_type i=0; i<n_sl; i++)
     idx[i] = static_cast<PetscInt>(send_list[i]);
   for (auto i : make_range(this->local_size()))
     idx[n_sl+i] = i + this->first_local_index();
 
-  // Create the index set & scatter object
+  // Create the index set & scatter objects
+  WrappedPetsc<IS> is;
   PetscInt * idxptr = idx.empty() ? nullptr : idx.data();
   ierr = ISCreateGeneral(this->comm().get(), n_sl+this->local_size(),
-                         idxptr, PETSC_USE_POINTER, &is);
+                         idxptr, PETSC_USE_POINTER, is.get());
   LIBMESH_CHKERR(ierr);
 
+  WrappedPetsc<VecScatter> scatter;
   ierr = VecScatterCreate(_vec,          is,
                           v_local->_vec, is,
-                          &scatter);
+                          scatter.get());
   LIBMESH_CHKERR(ierr);
 
 
   // Perform the scatter
-  ierr = VecScatterBegin(scatter, _vec, v_local->_vec,
-                         INSERT_VALUES, SCATTER_FORWARD);
-  LIBMESH_CHKERR(ierr);
-
-  ierr = VecScatterEnd  (scatter, _vec, v_local->_vec,
-                         INSERT_VALUES, SCATTER_FORWARD);
-  LIBMESH_CHKERR(ierr);
-
-  // Clean up
-  ierr = ISDestroy (&is);
-  LIBMESH_CHKERR(ierr);
-
-  ierr = VecScatterDestroy(&scatter);
-  LIBMESH_CHKERR(ierr);
+  VecScatterBeginEnd(this->comm(), scatter, _vec, v_local->_vec, INSERT_VALUES, SCATTER_FORWARD);
 
   // Make sure ghost dofs are up to date
   if (v_local->type() == GHOSTED)
@@ -805,8 +740,8 @@ void PetscVector<T>::localize (std::vector<T> & v_local,
   PetscErrorCode ierr = 0;
 
   // Create a sequential destination Vec with the right number of entries on each proc.
-  Vec dest;
-  ierr = VecCreateSeq(PETSC_COMM_SELF, cast_int<PetscInt>(indices.size()), &dest);
+  WrappedPetsc<Vec> dest;
+  ierr = VecCreateSeq(PETSC_COMM_SELF, cast_int<PetscInt>(indices.size()), dest.get());
   LIBMESH_CHKERR(ierr);
 
   // Create an IS using the libmesh routine.  PETSc does not own the
@@ -814,26 +749,22 @@ void PetscVector<T>::localize (std::vector<T> & v_local,
   // std::vector destructor.
   PetscInt * idxptr =
     indices.empty() ? nullptr : numeric_petsc_cast(indices.data());
-  IS is;
+  WrappedPetsc<IS> is;
   ierr = ISCreateGeneral(this->comm().get(), cast_int<PetscInt>(indices.size()), idxptr,
-                         PETSC_USE_POINTER, &is);
+                         PETSC_USE_POINTER, is.get());
   LIBMESH_CHKERR(ierr);
 
   // Create the VecScatter object. "PETSC_NULL" means "use the identity IS".
-  VecScatter scatter;
+  WrappedPetsc<VecScatter> scatter;
   ierr = VecScatterCreate(_vec,
                           /*src is=*/is,
                           /*dest vec=*/dest,
                           /*dest is=*/PETSC_NULL,
-                          &scatter);
+                          scatter.get());
   LIBMESH_CHKERR(ierr);
 
   // Do the scatter
-  ierr = VecScatterBegin(scatter, _vec, dest, INSERT_VALUES, SCATTER_FORWARD);
-  LIBMESH_CHKERR(ierr);
-
-  ierr = VecScatterEnd(scatter, _vec, dest, INSERT_VALUES, SCATTER_FORWARD);
-  LIBMESH_CHKERR(ierr);
+  VecScatterBeginEnd(this->comm(), scatter, _vec, dest, INSERT_VALUES, SCATTER_FORWARD);
 
   // Get access to the values stored in dest.
   PetscScalar * values;
@@ -849,16 +780,6 @@ void PetscVector<T>::localize (std::vector<T> & v_local,
 
   // We are done using it, so restore the array.
   ierr = VecRestoreArray (dest, &values);
-  LIBMESH_CHKERR(ierr);
-
-  // Clean up PETSc data structures.
-  ierr = VecScatterDestroy(&scatter);
-  LIBMESH_CHKERR(ierr);
-
-  ierr = ISDestroy (&is);
-  LIBMESH_CHKERR(ierr);
-
-  ierr = VecDestroy(&dest);
   LIBMESH_CHKERR(ierr);
 }
 
@@ -895,37 +816,24 @@ void PetscVector<T>::localize (const numeric_index_type first_local_idx,
 
   // Copy part of *this into the parallel_vec
   {
-    IS is;
-    VecScatter scatter;
-
     // Create idx, idx[i] = i+first_local_idx;
     std::vector<PetscInt> idx(my_local_size);
     std::iota (idx.begin(), idx.end(), first_local_idx);
 
-    // Create the index set & scatter object
+    // Create the index set & scatter objects
+    WrappedPetsc<IS> is;
     ierr = ISCreateGeneral(this->comm().get(), my_local_size,
-                           my_local_size ? idx.data() : nullptr, PETSC_USE_POINTER, &is);
+                           my_local_size ? idx.data() : nullptr, PETSC_USE_POINTER, is.get());
     LIBMESH_CHKERR(ierr);
 
+    WrappedPetsc<VecScatter> scatter;
     ierr = VecScatterCreate(_vec,              is,
                             parallel_vec._vec, is,
-                            &scatter);
+                            scatter.get());
     LIBMESH_CHKERR(ierr);
 
-    ierr = VecScatterBegin(scatter, _vec, parallel_vec._vec,
-                           INSERT_VALUES, SCATTER_FORWARD);
-    LIBMESH_CHKERR(ierr);
-
-    ierr = VecScatterEnd  (scatter, _vec, parallel_vec._vec,
-                           INSERT_VALUES, SCATTER_FORWARD);
-    LIBMESH_CHKERR(ierr);
-
-    // Clean up
-    ierr = ISDestroy (&is);
-    LIBMESH_CHKERR(ierr);
-
-    ierr = VecScatterDestroy(&scatter);
-    LIBMESH_CHKERR(ierr);
+    // Perform the scatter
+    VecScatterBeginEnd(this->comm(), scatter, _vec, parallel_vec._vec, INSERT_VALUES, SCATTER_FORWARD);
   }
 
   // localize like normal
@@ -1003,16 +911,13 @@ void PetscVector<Real>::localize_to_one (std::vector<Real> & v_local,
     {
       if (pid == 0) // optimized version for localizing to 0
         {
-          Vec vout;
-          VecScatter ctx;
+          WrappedPetsc<Vec> vout;
+          WrappedPetsc<VecScatter> ctx;
 
-          ierr = VecScatterCreateToZero(_vec, &ctx, &vout);
+          ierr = VecScatterCreateToZero(_vec, ctx.get(), vout.get());
           LIBMESH_CHKERR(ierr);
 
-          ierr = VecScatterBegin(ctx, _vec, vout, INSERT_VALUES, SCATTER_FORWARD);
-          LIBMESH_CHKERR(ierr);
-          ierr = VecScatterEnd(ctx, _vec, vout, INSERT_VALUES, SCATTER_FORWARD);
-          LIBMESH_CHKERR(ierr);
+          VecScatterBeginEnd(this->comm(), ctx, _vec, vout, INSERT_VALUES, SCATTER_FORWARD);
 
           if (processor_id() == 0)
             {
@@ -1027,12 +932,6 @@ void PetscVector<Real>::localize_to_one (std::vector<Real> & v_local,
               ierr = VecRestoreArray (vout, &values);
               LIBMESH_CHKERR(ierr);
             }
-
-          ierr = VecScatterDestroy(&ctx);
-          LIBMESH_CHKERR(ierr);
-          ierr = VecDestroy(&vout);
-          LIBMESH_CHKERR(ierr);
-
         }
       else
         {
@@ -1163,43 +1062,16 @@ void PetscVector<T>::pointwise_mult (const NumericVector<T> & vec1,
 {
   this->_restore_array();
 
-  PetscErrorCode ierr = 0;
-
   // Convert arguments to PetscVector*.
   const PetscVector<T> * vec1_petsc = cast_ptr<const PetscVector<T> *>(&vec1);
   const PetscVector<T> * vec2_petsc = cast_ptr<const PetscVector<T> *>(&vec2);
 
   // Call PETSc function.
-
-  if (this->type() != GHOSTED)
-    {
-      ierr = VecPointwiseMult(this->vec(),
-                              const_cast<PetscVector<T> *>(vec1_petsc)->vec(),
-                              const_cast<PetscVector<T> *>(vec2_petsc)->vec());
-      LIBMESH_CHKERR(ierr);
-    }
-  else
-    {
-      Vec loc_vec;
-      Vec v1_loc_vec;
-      Vec v2_loc_vec;
-      ierr = VecGhostGetLocalForm (_vec,&loc_vec);
-      LIBMESH_CHKERR(ierr);
-      ierr = VecGhostGetLocalForm (const_cast<PetscVector<T> *>(vec1_petsc)->vec(),&v1_loc_vec);
-      LIBMESH_CHKERR(ierr);
-      ierr = VecGhostGetLocalForm (const_cast<PetscVector<T> *>(vec2_petsc)->vec(),&v2_loc_vec);
-      LIBMESH_CHKERR(ierr);
-
-      ierr = VecPointwiseMult(loc_vec,v1_loc_vec,v2_loc_vec);
-      LIBMESH_CHKERR(ierr);
-
-      ierr = VecGhostRestoreLocalForm (const_cast<PetscVector<T> *>(vec1_petsc)->vec(),&v1_loc_vec);
-      LIBMESH_CHKERR(ierr);
-      ierr = VecGhostRestoreLocalForm (const_cast<PetscVector<T> *>(vec2_petsc)->vec(),&v2_loc_vec);
-      LIBMESH_CHKERR(ierr);
-      ierr = VecGhostRestoreLocalForm (_vec,&loc_vec);
-      LIBMESH_CHKERR(ierr);
-    }
+  VecGhostLocalFormRAII<T> ghost(*this, this->type() == GHOSTED);
+  VecGhostLocalFormRAII<T> v1_ghost(*vec1_petsc, this->type() == GHOSTED);
+  VecGhostLocalFormRAII<T> v2_ghost(*vec2_petsc, this->type() == GHOSTED);
+  PetscErrorCode ierr = VecPointwiseMult(ghost.local_form, v1_ghost.local_form, v2_ghost.local_form);
+  LIBMESH_CHKERR(ierr);
 }
 
 
@@ -1210,23 +1082,19 @@ void PetscVector<T>::print_matlab (const std::string & name) const
   this->_restore_array();
   libmesh_assert (this->closed());
 
-  PetscErrorCode ierr=0;
-  PetscViewer petsc_viewer;
+  PetscErrorCode ierr = 0;
 
-
-  ierr = PetscViewerCreate (this->comm().get(),
-                            &petsc_viewer);
+  WrappedPetsc<PetscViewer> petsc_viewer;
+  ierr = PetscViewerCreate (this->comm().get(), petsc_viewer.get());
   LIBMESH_CHKERR(ierr);
 
-  /**
-   * Create an ASCII file containing the matrix
-   * if a filename was provided.
-   */
+  // Create an ASCII file containing the matrix
+  // if a filename was provided.
   if (name != "")
     {
       ierr = PetscViewerASCIIOpen( this->comm().get(),
                                    name.c_str(),
-                                   &petsc_viewer);
+                                   petsc_viewer.get());
       LIBMESH_CHKERR(ierr);
 
 #if PETSC_VERSION_LESS_THAN(3,7,0)
@@ -1243,9 +1111,7 @@ void PetscVector<T>::print_matlab (const std::string & name) const
       LIBMESH_CHKERR(ierr);
     }
 
-  /**
-   * Otherwise the matrix will be dumped to the screen.
-   */
+  // Otherwise the matrix will be dumped to the screen.
   else
     {
 
@@ -1262,13 +1128,6 @@ void PetscVector<T>::print_matlab (const std::string & name) const
       ierr = VecView (_vec, PETSC_VIEWER_STDOUT_WORLD);
       LIBMESH_CHKERR(ierr);
     }
-
-
-  /**
-   * Destroy the viewer.
-   */
-  ierr = PetscViewerDestroy (&petsc_viewer);
-  LIBMESH_CHKERR(ierr);
 }
 
 
@@ -1282,8 +1141,6 @@ void PetscVector<T>::create_subvector(NumericVector<T> & subvector,
   this->_restore_array();
 
   // PETSc data structures
-  IS parent_is, subvector_is;
-  VecScatter scatter;
   PetscErrorCode ierr = 0;
 
   // Make sure the passed in subvector is really a PetscVector
@@ -1322,44 +1179,32 @@ void PetscVector<T>::create_subvector(NumericVector<T> & subvector,
   std::iota (idx.begin(), idx.end(), 0);
 
   // Construct index sets
+  WrappedPetsc<IS> parent_is;
   ierr = ISCreateGeneral(this->comm().get(),
                          cast_int<PetscInt>(rows.size()),
                          numeric_petsc_cast(rows.data()),
                          PETSC_USE_POINTER,
-                         &parent_is);
+                         parent_is.get());
   LIBMESH_CHKERR(ierr);
 
+  WrappedPetsc<IS> subvector_is;
   ierr = ISCreateGeneral(this->comm().get(),
                          cast_int<PetscInt>(rows.size()),
                          idx.data(),
                          PETSC_USE_POINTER,
-                         &subvector_is);
+                         subvector_is.get());
   LIBMESH_CHKERR(ierr);
 
   // Construct the scatter object
+  WrappedPetsc<VecScatter> scatter;
   ierr = VecScatterCreate(this->_vec,
                           parent_is,
                           petsc_subvector->_vec,
                           subvector_is,
-                          &scatter); LIBMESH_CHKERR(ierr);
+                          scatter.get()); LIBMESH_CHKERR(ierr);
 
   // Actually perform the scatter
-  ierr = VecScatterBegin(scatter,
-                         this->_vec,
-                         petsc_subvector->_vec,
-                         INSERT_VALUES,
-                         SCATTER_FORWARD); LIBMESH_CHKERR(ierr);
-
-  ierr = VecScatterEnd(scatter,
-                       this->_vec,
-                       petsc_subvector->_vec,
-                       INSERT_VALUES,
-                       SCATTER_FORWARD); LIBMESH_CHKERR(ierr);
-
-  // Clean up
-  ierr = ISDestroy(&parent_is);       LIBMESH_CHKERR(ierr);
-  ierr = ISDestroy(&subvector_is);    LIBMESH_CHKERR(ierr);
-  ierr = VecScatterDestroy(&scatter); LIBMESH_CHKERR(ierr);
+  VecScatterBeginEnd(this->comm(), scatter, this->_vec, petsc_subvector->_vec, INSERT_VALUES, SCATTER_FORWARD);
 }
 
 

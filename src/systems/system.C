@@ -87,7 +87,7 @@ System::System (EquationSystems & es,
   _sys_name                         (name_in),
   _sys_number                       (number_in),
   _active                           (true),
-  _can_add_matrices                 (true),
+  _matrices_initialized             (false),
   _solution_projection              (true),
   _basic_system_only                (false),
   _is_initialized                   (false),
@@ -180,7 +180,7 @@ void System::clear ()
 
   // clear any user-added matrices
   _matrices.clear();
-  _can_add_matrices = true;
+  _matrices_initialized = false;
 }
 
 
@@ -219,7 +219,14 @@ void System::init_data ()
     _dof_map->add_variable_group(this->variable_group(vg));
 
   // Distribute the degrees of freedom on the mesh
-  _dof_map->distribute_dofs (mesh);
+  auto total_dofs = _dof_map->distribute_dofs (mesh);
+
+  // Throw an error if the total number of DOFs is not capable of
+  // being indexed by our solution vector.
+  auto max_allowed_id = solution->max_allowed_id();
+  libmesh_error_msg_if(total_dofs > max_allowed_id,
+                       "Cannot allocate a NumericVector with " << total_dofs << " degrees of freedom. "
+                       "The vector can only index up to " << max_allowed_id << " entries.");
 
   // Recreate any user or internal constraints
   this->reinit_constraints();
@@ -284,18 +291,26 @@ void System::init_data ()
 
 void System::init_matrices ()
 {
-  // no chance to add other matrices
-  _can_add_matrices = false;
-
   // No matrices to init
   if (_matrices.empty())
-    return;
+    {
+      // any future matrices to be added will need their own
+      // initialization
+      _matrices_initialized = true;
+
+      return;
+    }
 
   // Check for quick return in case the first matrix
   // (and by extension all the matrices) has already
   // been initialized
   if (_matrices.begin()->second->initialized())
-    return;
+    {
+      libmesh_assert(_matrices_initialized);
+      return;
+    }
+
+  _matrices_initialized = true;
 
   // Tell the matrices about the dof map, and vice versa
   for (auto & pr : _matrices)
@@ -860,16 +875,11 @@ SparseMatrix<Number> & System::add_matrix (const std::string & mat_name,
                                            const ParallelType type,
                                            const MatrixBuildType mat_build_type)
 {
-  // only add matrices before initializing...
-  if (!_can_add_matrices)
-    libmesh_error_msg("ERROR: Too late.  Cannot add matrices to the system after initialization"
-                      << "\n any more.  You should have done this earlier.");
-
   // Return the matrix if it is already there.
   if (this->have_matrix(mat_name))
     return *(_matrices[mat_name]);
 
-  // Otherwise build the matrix and return a reference to it.
+  // Otherwise build the matrix to return.
   auto pr = _matrices.emplace
     (mat_name,
      SparseMatrix<Number>::build(this->comm(),
@@ -878,8 +888,26 @@ SparseMatrix<Number> & System::add_matrix (const std::string & mat_name,
 
   _matrix_types.emplace(mat_name, type);
 
-  return *(pr.first->second);
+  SparseMatrix<Number> & mat = *(pr.first->second);
+
+  // Initialize it first if we've already initialized the others.
+  this->late_matrix_init(mat, type);
+
+  return mat;
 }
+
+
+
+void System::late_matrix_init(SparseMatrix<Number> & mat,
+                              ParallelType type)
+{
+  if (_matrices_initialized)
+    {
+      this->get_dof_map().attach_matrix(mat);
+      mat.init(type);
+    }
+}
+
 
 
 

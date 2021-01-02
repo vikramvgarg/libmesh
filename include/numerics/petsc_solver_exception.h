@@ -22,17 +22,28 @@
 
 #ifdef LIBMESH_HAVE_PETSC
 
-#include "libmesh_exceptions.h"
+#include "libmesh/libmesh_exceptions.h"
+
 #ifdef I
 # define LIBMESH_SAW_I
 #endif
+
+#include "libmesh/ignore_warnings.h"
 #include <petscsys.h>
+#include "libmesh/restore_warnings.h"
+
 #ifndef LIBMESH_SAW_I
 # undef I // Avoid complex.h contamination
 #endif
 
 namespace libMesh
 {
+
+// Forward declarations
+namespace Parallel
+{
+class Communicator;
+}
 
 // The SolverException class is only defined when exceptions are enabled.
 #ifdef LIBMESH_ENABLE_EXCEPTIONS
@@ -71,16 +82,47 @@ public:
       throw PetscSolverException(ierr);         \
     } } while (0)
 
+// Two-argument CHKERR macro that takes both a comm and an error
+// code. When exceptions are enabled, the comm is not used for
+// anything, so we libmesh_ignore() it.  This macro is useful when you
+// need to call LIBMESH_CHKERR but you're not in a ParallelObject.
+#define LIBMESH_CHKERR2(comm, ierr)             \
+  do {                                          \
+    libmesh_ignore(comm);                       \
+    LIBMESH_CHKERR(ierr);                       \
+  } while (0)
+
 #else
 
 // If we don't have exceptions enabled, just fall back on calling
 // PETSc's CHKERRABORT macro.
 #define LIBMESH_CHKERR(ierr) CHKERRABORT(this->comm().get(), ierr);
 
+// Two argument version of the function above where you pass in the comm
+// instead of relying on it being available from the "this" pointer.
+#define LIBMESH_CHKERR2(comm, ierr) CHKERRABORT(comm.get(), ierr);
+
 // Let's also be backwards-compatible with the old macro name.
 #define LIBMESH_CHKERRABORT(ierr) LIBMESH_CHKERR(ierr)
 
 #endif
+
+#define PETSC_BEGIN_END(Function)                                       \
+  template<class ...Args>                                               \
+  inline                                                                \
+  void Function ## BeginEnd(const Parallel::Communicator & comm, const Args&... args) \
+  {                                                                     \
+    PetscErrorCode ierr = 0;                                            \
+    ierr = Function ## Begin(args...);                                  \
+    LIBMESH_CHKERR2(comm, ierr);                                        \
+    ierr = Function ## End(args...);                                    \
+    LIBMESH_CHKERR2(comm, ierr);                                        \
+  }
+
+PETSC_BEGIN_END(VecScatter) // VecScatterBeginEnd
+PETSC_BEGIN_END(MatAssembly) // MatAssemblyBeginEnd
+PETSC_BEGIN_END(VecAssembly) // VecAssemblyBeginEnd
+PETSC_BEGIN_END(VecGhostUpdate) // VecGhostUpdateBeginEnd
 
 } // namespace libMesh
 

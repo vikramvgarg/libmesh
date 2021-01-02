@@ -259,6 +259,7 @@ libmesh_SOURCES =  \
         src/numerics/trilinos_preconditioner.C \
         src/numerics/type_tensor.C \
         src/numerics/type_vector.C \
+        src/numerics/wrapped_petsc.C \
         src/parallel/parallel_bin_sorter.C \
         src/parallel/parallel_elem.C \
         src/parallel/parallel_ghost_sync.C \
@@ -403,6 +404,7 @@ libmesh_SOURCES =  \
         src/systems/fem_system.C \
         src/systems/frequency_system.C \
         src/systems/implicit_system.C \
+        src/systems/inter_mesh_projection.C \
         src/systems/linear_implicit_system.C \
         src/systems/newmark_system.C \
         src/systems/nonlinear_implicit_system.C \

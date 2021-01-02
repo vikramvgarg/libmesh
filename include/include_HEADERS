@@ -273,6 +273,7 @@ include_HEADERS =  \
         numerics/vector_value.h \
         numerics/wrapped_function.h \
         numerics/wrapped_functor.h \
+        numerics/wrapped_petsc.h \
         numerics/zero_function.h \
         parallel/libmesh_call_mpi.h \
         parallel/parallel.h \
@@ -403,6 +404,7 @@ include_HEADERS =  \
         systems/frequency_system.h \
         systems/generic_projector.h \
         systems/implicit_system.h \
+        systems/inter_mesh_projection.h \
         systems/linear_implicit_system.h \
         systems/newmark_system.h \
         systems/nonlinear_implicit_system.h \

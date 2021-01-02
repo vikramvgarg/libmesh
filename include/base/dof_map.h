@@ -193,21 +193,10 @@ public:
   ~DofMap();
 
   /**
-   * Abstract base class to be used to add user-defined implicit
-   * degree of freedom couplings.
+   * Backwards compatibility for prior AugmentSparsityPattern users.
    */
-  class AugmentSparsityPattern
-  {
-  public:
-    virtual ~AugmentSparsityPattern () {}
-
-    /**
-     * User-defined function to augment the sparsity pattern.
-     */
-    virtual void augment_sparsity_pattern (SparsityPattern::Graph & sparsity,
-                                           std::vector<dof_id_type> & n_nz,
-                                           std::vector<dof_id_type> & n_oz) = 0;
-  };
+  class AugmentSparsityPattern : public SparsityPattern::AugmentSparsityPattern
+  {};
 
   /**
    * Abstract base class to be used to add user-defined parallel
@@ -225,11 +214,19 @@ public:
   };
 
   /**
-   * Additional matrices may be handled with this \p DofMap.
+   * Additional matrices may be attached to this \p DofMap.
    * They are initialized to the same sparsity structure as
    * the major matrix.
    */
   void attach_matrix (SparseMatrix<Number> & matrix);
+
+  /**
+   * Additional matrices may be be temporarily initialized by this \p
+   * DofMap.
+   * They are initialized to the same sparsity structure as
+   * the major matrix.
+   */
+  void update_sparsity_pattern(SparseMatrix<Number> & matrix) const;
 
   /**
    * Matrices should not be attached more than once.  We can test for
@@ -241,8 +238,9 @@ public:
    * Distribute dofs on the current mesh.  Also builds the send list for
    * processor \p proc_id, which defaults to 0 for ease of use in serial
    * applications.
+   * \returns The total number of DOFs for the System, summed across all procs.
    */
-  void distribute_dofs (MeshBase &);
+  std::size_t distribute_dofs (MeshBase &);
 
   /**
    * Computes the sparsity pattern for the matrices corresponding to
@@ -250,6 +248,11 @@ public:
    * preallocation of sparse matrices.
    */
   void compute_sparsity (const MeshBase &);
+
+  /**
+   * Returns true iff a sparsity pattern has already been computed.
+   */
+  bool computed_sparsity_already () const;
 
   /**
    * Clears the sparsity pattern
@@ -412,7 +415,7 @@ public:
    *
    * This is an advanced function... use at your own peril!
    */
-  void attach_extra_sparsity_object (DofMap::AugmentSparsityPattern & asp)
+  void attach_extra_sparsity_object (SparsityPattern::AugmentSparsityPattern & asp)
   {
     _augment_sparsity_pattern = &asp;
   }
@@ -504,8 +507,8 @@ public:
    */
   const std::vector<dof_id_type> & get_n_nz() const
   {
-    libmesh_assert(_n_nz);
-    return *_n_nz;
+    libmesh_assert(_sp);
+    return _sp->get_n_nz();
   }
 
   /**
@@ -517,8 +520,22 @@ public:
    */
   const std::vector<dof_id_type> & get_n_oz() const
   {
-    libmesh_assert(_n_oz);
-    return *_n_oz;
+    libmesh_assert(_sp);
+    return _sp->get_n_oz();
+  }
+
+
+  /**
+   * \returns A constant pointer to the sparsity pattern stored here,
+   * once that has been computed.  Returns null if no sparsity pattern
+   * has yet been computed.
+   *
+   * If need_full_sparsity_pattern is false, the "sparsity pattern"
+   * may only own n_nz and n_oz lists.
+   */
+  const SparsityPattern::Build * get_sparsity_pattern() const
+  {
+    return _sp.get();
   }
 
   // /**
@@ -1436,6 +1453,11 @@ public:
    */
   unsigned int sys_number() const;
 
+  /**
+   * Builds a sparsity pattern
+   */
+  std::unique_ptr<SparsityPattern::Build> build_sparsity(const MeshBase & mesh) const;
+
 private:
 
   /**
@@ -1471,11 +1493,6 @@ private:
                           const DofObject & obj,
                           std::vector<dof_id_type> & di,
                           const unsigned int vn) const;
-
-  /**
-   * Builds a sparsity pattern
-   */
-  std::unique_ptr<SparsityPattern::Build> build_sparsity(const MeshBase & mesh) const;
 
   /**
    * Invalidates all active DofObject dofs for this system
@@ -1673,7 +1690,7 @@ private:
   /**
    * Function object to call to add extra entries to the sparsity pattern
    */
-  AugmentSparsityPattern * _augment_sparsity_pattern;
+  SparsityPattern::AugmentSparsityPattern * _augment_sparsity_pattern;
 
   /**
    * A function pointer to a function to call to add extra entries to the sparsity pattern
@@ -1754,24 +1771,11 @@ private:
   bool need_full_sparsity_pattern;
 
   /**
-   * The sparsity pattern of the global matrix, kept around if it
-   * might be needed by future additions of the same type of matrix.
+   * The sparsity pattern of the global matrix.  If
+   * need_full_sparsity_pattern is true, we save the entire sparse
+   * graph here.  Otherwise we save just the n_nz and n_oz vectors.
    */
   std::unique_ptr<SparsityPattern::Build> _sp;
-
-  /**
-   * The number of on-processor nonzeros in my portion of the
-   * global matrix.  If need_full_sparsity_pattern is true, this will
-   * just be a pointer into the corresponding sparsity pattern vector.
-   * Otherwise we have to new/delete it ourselves.
-   */
-  std::vector<dof_id_type> * _n_nz;
-
-  /**
-   * The number of off-processor nonzeros in my portion of the
-   * global matrix; allocated similar to _n_nz.
-   */
-  std::vector<dof_id_type> * _n_oz;
 
   /**
    * Total number of degrees of freedom.

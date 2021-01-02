@@ -48,6 +48,7 @@
 #include <cstring>
 #include <vector>
 #include <unordered_map>
+#include <limits>
 
 #ifdef LIBMESH_HAVE_CXX11_THREAD
 #include <atomic>
@@ -323,6 +324,8 @@ public:
                                 const std::vector<numeric_index_type> & rows) const override;
 
   virtual void swap (NumericVector<T> & v) override;
+
+  virtual std::size_t max_allowed_id() const override;
 
   /**
    * \returns The raw PETSc Vec pointer.
@@ -813,20 +816,10 @@ void PetscVector<T>::close ()
 
   this->_restore_array();
 
-  PetscErrorCode ierr=0;
-
-  ierr = VecAssemblyBegin(_vec);
-  LIBMESH_CHKERR(ierr);
-  ierr = VecAssemblyEnd(_vec);
-  LIBMESH_CHKERR(ierr);
+  VecAssemblyBeginEnd(this->comm(), _vec);
 
   if (this->type() == GHOSTED)
-    {
-      ierr = VecGhostUpdateBegin(_vec,INSERT_VALUES,SCATTER_FORWARD);
-      LIBMESH_CHKERR(ierr);
-      ierr = VecGhostUpdateEnd(_vec,INSERT_VALUES,SCATTER_FORWARD);
-      LIBMESH_CHKERR(ierr);
-    }
+    VecGhostUpdateBeginEnd(this->comm(), _vec, INSERT_VALUES, SCATTER_FORWARD);
 
   this->_is_closed = true;
 }
@@ -1204,6 +1197,15 @@ void PetscVector<T>::swap (NumericVector<T> & other)
 }
 
 
+
+template <typename T>
+inline
+std::size_t PetscVector<T>::max_allowed_id () const
+{
+  // The PetscInt type is used for indexing, it may be either a signed
+  // 4-byte or 8-byte integer depending on how PETSc is configured.
+  return std::numeric_limits<PetscInt>::max();
+}
 
 
 
