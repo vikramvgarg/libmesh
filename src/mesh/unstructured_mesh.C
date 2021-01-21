@@ -62,9 +62,6 @@ void UnstructuredMesh::assign (MeshBase & other_mesh)
   // Needs clarification
   this->ParallelObject::operator=(other_mesh);
 
-  BoundaryInfo other_mesh_boundary_info = other_mesh.get_boundary_info();
-  boundary_info = std::unique_ptr<BoundaryInfo>(&other_mesh_boundary_info);
-
   _n_parts = other_mesh.n_partitions();
   _default_mapping_type = other_mesh.default_mapping_type();
   _default_mapping_data = other_mesh.default_mapping_data();
@@ -80,15 +77,45 @@ void UnstructuredMesh::assign (MeshBase & other_mesh)
   _allow_remote_element_removal = other_mesh.allow_remote_element_removal();
   _elem_dims = other_mesh.elem_dimensions();
   _spatial_dimension = other_mesh.spatial_dimension();
-  _default_ghosting = std::unique_ptr<GhostingFunctor>(&(other_mesh.default_ghosting()));
+  //_default_ghosting = other_mesh.default_ghosting().clone();
   _point_locator_close_to_point_tol = other_mesh.get_point_locator_close_to_point_tol();
 
-  GhostingFunctor * other_default_ghosting = &(other_mesh.default_ghosting());
+  this->copy_nodes_and_elements(dynamic_cast<UnstructuredMesh &>(other_mesh), true);
+
+  //BoundaryInfo other_mesh_boundary_info = other_mesh.get_boundary_info();
+  const auto & other_boundary_info = other_mesh.get_boundary_info();
+  //boundary_info = other_mesh.get_boundary_info().clone();
+  auto & this_boundary_info = this->get_boundary_info();
+  this_boundary_info = other_boundary_info;
+  //boundary_info = std::unique_ptr<BoundaryInfo>(&other_mesh.get_boundary_info());
+
+  this->set_subdomain_name_map() = other_mesh.get_subdomain_name_map();
+
+  // We need to rebuild the boundary side ids
+  std::vector<boundary_id_type> side_boundaries;
+  other_boundary_info.build_side_boundary_ids(side_boundaries);
+
+  // Assign those boundary ids in our BoundaryInfo object
+  for (const auto & side_bnd_id : side_boundaries)
+    this_boundary_info.sideset_name(side_bnd_id) =
+      other_boundary_info.get_sideset_name(side_bnd_id);
+
+  // Do the same thing for node boundary ids
+  std::vector<boundary_id_type> node_boundaries;
+  other_boundary_info.build_node_boundary_ids(node_boundaries);
+
+  for (const auto & node_bnd_id : node_boundaries)
+    this_boundary_info.nodeset_name(node_bnd_id) =
+      other_boundary_info.get_nodeset_name(node_bnd_id);
+
+  //GhostingFunctor * other_default_ghosting = &(other_mesh.default_ghosting());
+
+  const GhostingFunctor * const other_default_ghosting = &(other_mesh.default_ghosting());
 
   std::set<GhostingFunctor *>::const_iterator other_mesh_gf_begin_it = other_mesh.ghosting_functors_begin();
-  std::set<GhostingFunctor *>::const_iterator other_mesh_gf_end_it = other_mesh.ghosting_functors_begin();
+  std::set<GhostingFunctor *>::const_iterator other_mesh_gf_end_it = other_mesh.ghosting_functors_end();
 
-  for (auto gf = other_mesh_gf_begin_it; gf != other_mesh_gf_end_it; gf++ )
+  for (auto gf = other_mesh_gf_begin_it; gf != other_mesh_gf_end_it; ++gf )
     {
       // If the other mesh is using default ghosting, then we will use our own
       // default ghosting
@@ -98,7 +125,8 @@ void UnstructuredMesh::assign (MeshBase & other_mesh)
           continue;
         }
 
-      std::shared_ptr<GhostingFunctor> clone_gf = std::shared_ptr<GhostingFunctor>(*gf);
+      //std::shared_ptr<GhostingFunctor> clone_gf = std::shared_ptr<GhostingFunctor>(*gf);
+      std::shared_ptr<GhostingFunctor> clone_gf = (*gf)->clone();
       // Some subclasses of GhostingFunctor might not override the
       // clone function yet. If this is the case, GhostingFunctor will
       // return nullptr by default. The clone function should be overridden
