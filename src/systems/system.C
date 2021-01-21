@@ -189,7 +189,8 @@ void System::init ()
 {
   // Calling init() twice on the same system currently works evil
   // magic, whether done directly or via EquationSystems::read()
-  libmesh_assert(!this->is_initialized());
+  // Testing to see what parts of init we need after doing an assign.
+  //libmesh_assert(!this->is_initialized());
 
   // First initialize any required data:
   // either only the basic System data
@@ -1182,7 +1183,8 @@ unsigned int System::add_variable (const std::string & var,
                                    const FEType & type,
                                    const std::set<subdomain_id_type> * const active_subdomains)
 {
-  libmesh_assert(!this->is_initialized());
+  // Testing to see which parts of init we need after an assign.
+  //libmesh_assert(!this->is_initialized());
 
   // Make sure the variable isn't there already
   // or if it is, that it's the type we want
