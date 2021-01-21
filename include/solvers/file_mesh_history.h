@@ -23,8 +23,10 @@
 // Local includes
 #include "libmesh/numeric_vector.h"
 #include "libmesh/mesh_history.h"
+#include "libmesh/distributed_mesh.h"
 #include "libmesh/enum_xdr_mode.h"
 #include "libmesh/equation_systems.h"
+#include "libmesh/inter_mesh_projection.h"
 #include "libmesh/libmesh.h"
 #include "libmesh/auto_ptr.h" // libmesh_make_unique
 
@@ -116,6 +118,14 @@ private:
   // between primal and adjoint time loops
   std::map<Real, unsigned int>::iterator timeTotimestamp_iterator;
 
+  // ES & System reference to hold the projected vectors provided by inter_mesh_projector
+  //MeshBase * target_mesh;
+  //EquationSystems * inter_mesh_equation_systems;
+  //System * inter_mesh_system;
+
+  // An inter mesh projection object to project extant adjoint and other system vectors
+  // onto the incoming mesh
+  //InterMeshProjection * inter_mesh_projector;
 };
 
 } // end namespace libMesh

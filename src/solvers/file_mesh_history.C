@@ -23,8 +23,12 @@
 #include "libmesh/diff_system.h"
 // For the MeshRefinement Object
 #include "libmesh/mesh_base.h"
+#include "libmesh/boundary_info.h"
 #include "libmesh/mesh_refinement.h"
 #include "libmesh/equation_systems.h"
+#include "libmesh/system_norm.h"
+#include "libmesh/enum_norm_type.h"
+#include "libmesh/dof_map.h"
 
 #include <cmath>
 #include <iterator>
@@ -34,6 +38,7 @@ namespace libMesh
 
   class EquationSystems;
   class MeshBase;
+  class BoundaryInfo;
 
 /**
    * Constructor, reference to system to be passed by user, set the
@@ -42,8 +47,33 @@ namespace libMesh
   FileMeshHistory::FileMeshHistory(System & system_)
   : stored_meshes_it(stored_meshes.end()),
   _system(system_), localTimestamp(0),
-  timeTotimestamp()
+  timeTotimestamp() //, target_mesh(&system_.get_mesh())
   {
+    // Intialize the inter_mesh_equation_system with a mesh of the right dimension
+    //target_mesh = new Mesh(system_.get_mesh().comm(), system_.get_mesh().mesh_dimension());
+    //inter_mesh_equation_systems = new EquationSystems(*target_mesh);
+
+    // Set up the inter_mesh_system to be supplied to inter_mesh_projector with the
+    // the right variables and vectors
+    //inter_mesh_system = & inter_mesh_equation_systems->add_system<System> ("InterMeshSystem");
+
+    // Match variables
+    //unsigned int n_vars = _system.n_vars();
+    //for (unsigned int j = 0; j != n_vars; ++j)
+    //{
+      //inter_mesh_system->add_variable(_system.variable_name(j), _system.variable(j).type().order, _system.variable(j).type().family);
+    //}
+
+    // Match vectors as well
+    //for (System::vectors_iterator vec = _system.vectors_begin(), vec_end = _system.vectors_end(); vec != vec_end; ++vec)
+    //{
+      //inter_mesh_system->add_vector(vec->first, inter_mesh_system->vector_preservation(vec->first), (vec->second)->type());
+    //}
+
+    //inter_mesh_equation_systems->init ();
+
+    //inter_mesh_projector = new InterMeshProjection(_system, *inter_mesh_system);
+
     libmesh_experimental();
   }
 
@@ -265,6 +295,67 @@ void FileMeshHistory::retrieve(bool is_adjoint_solve, Real time)
       return;
     }
 
+    // Testing norms of system vectors
+    // Compute the H1 norm of the velocity variables
+    Real T_H1 = _system.calculate_norm(*_system.solution, 0, H1);
+    Real T_L2 = _system.calculate_norm(*_system.solution, 0, L2);
+
+    std::cout << "T_before(H1) = " << T_H1 << std::endl << "T_before(L2) = " << T_L2 << std::endl;
+
+    // Compute the H1 norm of the velocity variables
+	  Real T_adjoint_H1 = _system.calculate_norm(_system.get_adjoint_solution(), 0, H1);
+	  Real T_adjoint_L2 = _system.calculate_norm(_system.get_adjoint_solution(), 0, L2);
+
+	  std::cout << "T_adjoint(H1) = " << T_adjoint_H1 << std::endl << "T_adjoint(L2) = " << T_adjoint_L2 << std::endl ;
+
+    // Print solution vector
+    libMesh::out << "U = [" << (*_system.solution)
+                   << "];" << std::endl;
+
+    // Print adjoint vector
+    libMesh::out << "Z = [" << _system.get_adjoint_solution()
+                   << "];" << std::endl;
+
+    // Testing that the mesh properties match
+    _system.get_mesh().print_info();
+
+    Mesh temp_mesh(_system.get_mesh().comm(), _system.get_mesh().mesh_dimension());
+    temp_mesh.read(stored_meshes_it->second);
+    temp_mesh.print_info();
+
+    EquationSystems inter_mesh_equation_systems(temp_mesh);
+    //EquationSystems inter_mesh_equation_systems(_system.get_mesh());
+    System & inter_mesh_system = inter_mesh_equation_systems.add_system<System> ("temp_system");
+    // Match variables
+    unsigned int n_vars = _system.n_vars();
+    for (unsigned int j = 0; j != n_vars; ++j)
+    {
+      inter_mesh_system.add_variable(_system.variable_name(j), _system.variable(j).type().order, _system.variable(j).type().family);
+    }
+
+    inter_mesh_equation_systems.init();
+
+    // Match vectors as well
+    for (System::vectors_iterator vec = _system.vectors_begin(), vec_end = _system.vectors_end(); vec != vec_end; ++vec)
+    {
+      inter_mesh_system.add_vector(vec->first, inter_mesh_system.vector_preservation(vec->first), (vec->second)->type());
+    }
+    InterMeshProjection inter_mesh_projector(_system, inter_mesh_system);
+
+    inter_mesh_projector.project_system_vectors();
+
+    // Testing norms of system vectors
+    // Compute the H1 norm of the velocity variables
+    T_H1 = _system.calculate_norm(*_system.solution, 0, H1);
+    T_L2 = _system.calculate_norm(*_system.solution, 0, L2);
+
+    std::cout << "T_after_projection(H1) = " << T_H1 << std::endl << "T_after_projection(L2) = " << T_L2 << std::endl;
+
+    T_adjoint_H1 = _system.calculate_norm(_system.get_adjoint_solution(), 0, H1);
+	  T_adjoint_L2 = _system.calculate_norm(_system.get_adjoint_solution(), 0, L2);
+
+	  std::cout << "T_adjoint_after_projection(H1) = " << T_adjoint_H1 << std::endl << "T_adjoint_after_projection(L2) = " << T_adjoint_L2 << std::endl ;
+
     // // At this point, we could replaced the old mesh with the new read in mesh, but then we wont be able to call es.reinit() to project
     // // vectors, since the projections there are meant to be performed between different refinement levels
     // // of the same mesh.
@@ -272,26 +363,98 @@ void FileMeshHistory::retrieve(bool is_adjoint_solve, Real time)
     // // to project our vectors from the old mesh to the new one being read in.
     // // Then, we can clear the old mesh, read in the new one and replace
     // // vectors in _system with those from _projection_system and carry on.
-    // Mesh destination_mesh (init.comm(), param.dimension);
-    // destination_mesh.read(stored_meshes_it->second);
+    //Mesh temp_mesh(_system.get_mesh().comm(), _system.get_mesh().mesh_dimension());
+    //temp_mesh.read(stored_meshes_it->second);
+    //inter_mesh_system->get_mesh().clear();
+    //inter_mesh_system->get_mesh().assign(temp_mesh);
+
+    // Before calling the IMP methods, we need to match the variables and vectors
+    // between _system and inter_mesh_system
+
+    //inter_mesh_equation_systems->reinit();
     // EquationSystems destination_equation_systems (destination_mesh);
     // System &destination_system = destination_equation_systems.add_system<System> ("DestinationHeatSystem");
     // // Add all the variables from _system to destination_system
     // // Add all the vectors from _system to destination_system
-    // InterMeshProjection inter_mesh_projector(_system , destination_system);
-    // inter_mesh_projector.project_vectors();
+    //InterMeshProjection inter_mesh_projector(_system , *inter_mesh_system);
+    //inter_mesh_projector->project_system_vectors();
 
     // Read in the mesh at this time instant and reinit to project solutions on to the new mesh
     _system.get_mesh().clear();
-    _system.get_mesh().read(stored_meshes_it->second);
+    //_system.get_mesh().read(stored_meshes_it->second);
+    _system.get_mesh().assign(temp_mesh);
+    _system.get_mesh().print_info();
+
+    // Reinit the DofMap now that the mesh has changed
+    std::cout<<"N_systems_1: "<<_system.get_equation_systems().n_systems()<<std::endl;
+    //_system.get_dof_map().distribute_dofs(_system.get_mesh());
+    _system.get_equation_systems().init();
 
     // Replace the vectors in _system with those from destination_system
+    _system.solution = std::move(inter_mesh_system.solution);
 
-    //_system.get_equation_systems().reinit();
+    // Match vectors as well
+    for (System::vectors_iterator vec = _system.vectors_begin(), vec_end = _system.vectors_end(); vec != vec_end; ++vec)
+    {
+      // The name of this vector
+      const std::string & vec_name = vec->first;
+
+      _system.get_vector(vec_name) = inter_mesh_system.get_vector(vec_name);
+    }
+
+    // // Testing norms of system vectors
+    // // Compute the H1 norm of the velocity variables
+    // T_H1 = _system.calculate_norm(*_system.solution, 0, H1);
+    // T_L2 = _system.calculate_norm(*_system.solution, 0, L2);
+
+    // std::cout << "T_after_assign(H1) = " << T_H1 << std::endl << "T_after_assign(L2) = " << T_L2 << std::endl;
+
+    // T_adjoint_H1 = _system.calculate_norm(_system.get_adjoint_solution(), 0, H1);
+	  // T_adjoint_L2 = _system.calculate_norm(_system.get_adjoint_solution(), 0, L2);
+
+	  // std::cout << "T_adjoint_after_assign(H1) = " << T_adjoint_H1 << std::endl << "T_adjoint_after_assign(L2) = " << T_adjoint_L2 << std::endl ;
+
+    // // Print solution vector
+    // libMesh::out << "U_after_assign = [" << (*_system.solution)
+    //                << "];" << std::endl;
+
+    // // Print adjoint vector
+    // libMesh::out << "Z_after_assign = [" << _system.get_adjoint_solution()
+    //                << "];" << std::endl;
+
+    std::cout<<"N_systems_2: "<<_system.get_equation_systems().n_systems()<<std::endl;
+    _system.get_equation_systems().reinit();
 
     // We need to call update to put system in a consistent state
     // with the mesh that was read in
     _system.update();
+
+    // Testing norms of system vectors
+    // Compute the H1 norm of the velocity variables
+    T_H1 = _system.calculate_norm(*_system.solution, 0, H1);
+    T_L2 = _system.calculate_norm(*_system.solution, 0, L2);
+
+    std::cout << "T_after_reinit(H1) = " << T_H1 << std::endl << "T_after_assign(L2) = " << T_L2 << std::endl;
+
+    T_adjoint_H1 = _system.calculate_norm(_system.get_adjoint_solution(), 0, H1);
+	  T_adjoint_L2 = _system.calculate_norm(_system.get_adjoint_solution(), 0, L2);
+
+	  std::cout << "T_adjoint_after_reinit(H1) = " << T_adjoint_H1 << std::endl << "T_adjoint_after_assign(L2) = " << T_adjoint_L2 << std::endl ;
+
+    // Print solution vector
+    libMesh::out << "U_after_reinit = [" << (*_system.solution)
+                   << "];" << std::endl;
+
+    // Print adjoint vector
+    libMesh::out << "Z_after_reinit = [" << _system.get_adjoint_solution()
+                   << "];" << std::endl;
+
+    // Testing
+    auto n_conds = _system.get_mesh().get_boundary_info().n_boundary_conds();
+
+    std::cout<<"n_conds: "<<n_conds;
+
+    _system.get_mesh().write("test.xda");
 
 }
 
