@@ -34,7 +34,7 @@ void NoMeshHistory::store(bool /* is_adjoint_solve */, Real /* time */)
 void NoMeshHistory::retrieve(bool /* is_adjoint_solve */, Real /* time */)
 {
   // Nothing was stored, so nothing can be retrieved
-  libmesh_not_implemented();
+  //libmesh_not_implemented();
 }
 
 void NoMeshHistory::erase(Real /* time */)
