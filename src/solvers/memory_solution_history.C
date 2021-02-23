@@ -43,7 +43,8 @@ MemorySolutionHistory::~MemorySolutionHistory ()
    * stored_sols iterator to some initial value
    */
 MemorySolutionHistory::MemorySolutionHistory(System & system_)
-:SolutionHistory(), stored_sols(stored_solutions.end()), _system(system_)
+:SolutionHistory(), stored_sols(stored_solutions.end()), _system(system_),
+ _number_h_refinements(0), _number_p_refinements(0)
 {
   dual_solution_copies.resize(system_.n_qois());
 
