@@ -118,6 +118,12 @@ public:
   virtual std::unique_ptr<MeshBase> clone() const = 0;
 
   /**
+   * Assignment function, will move argument onto the MeshBase object.
+   * Definition in derived classes.
+   */
+  virtual void assign (MeshBase & other_mesh) = 0;
+
+  /**
    * Destructor.
    */
   virtual ~MeshBase ();
