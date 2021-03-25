@@ -100,47 +100,6 @@ MeshBase & DistributedMesh::operator= (MeshBase && other_mesh)
   return *this;
 }
 
-void DistributedMesh::assign (MeshBase & other_mesh)
-{
-  // First call the assign implementation of Unstructured::assign
-  this->UnstructuredMesh::assign(other_mesh);
-
-  _is_serial = reinterpret_cast<DistributedMesh &>(other_mesh).is_serial();
-  _is_serial_on_proc_0 = reinterpret_cast<DistributedMesh &>(other_mesh).is_serial_on_zero();
-
-  _n_nodes = reinterpret_cast<DistributedMesh &>(other_mesh).n_nodes();
-  _n_elem = reinterpret_cast<DistributedMesh &>(other_mesh).n_elem();
-  _max_node_id = reinterpret_cast<DistributedMesh &>(other_mesh).max_node_id();
-  _max_elem_id = reinterpret_cast<DistributedMesh &>(other_mesh).max_elem_id();
-
-  _next_free_local_node_id = reinterpret_cast<DistributedMesh &>(other_mesh)._next_free_local_node_id;
-  _next_free_local_elem_id = reinterpret_cast<DistributedMesh &>(other_mesh)._next_free_local_elem_id;
-  _next_free_unpartitioned_node_id = reinterpret_cast<DistributedMesh &>(other_mesh)._next_free_unpartitioned_node_id;
-  _next_free_unpartitioned_elem_id = reinterpret_cast<DistributedMesh &>(other_mesh)._next_free_unpartitioned_elem_id;
-
-  #ifdef LIBMESH_ENABLE_UNIQUE_ID
-  _next_unpartitioned_unique_id = reinterpret_cast<DistributedMesh &>(other_mesh)._next_unpartitioned_unique_id;
-  #endif
-
-  // Loop over all elems in the other_mesh's set and set _extra_ghost_elems
-  // elementwise to the element with the same id in the new mesh
-  std::set<Elem *>::iterator it_other_mesh;
-  unsigned int elem_id;
-
-  // Begin loop over elements in the other mesh's set
-  for(it_other_mesh = reinterpret_cast<DistributedMesh &>(other_mesh)._extra_ghost_elems.begin(); it_other_mesh != reinterpret_cast<DistributedMesh &>(other_mesh)._extra_ghost_elems.end(); it_other_mesh++)
-  {
-    // Find the id corresponding to the current elem * in the set
-    elem_id = (*it_other_mesh)->id();
-
-    // Get the elem * corresponding to the above id in the new mesh
-    // and insert it in the _extra_ghost_elems member of the new mesh
-    _extra_ghost_elems.insert(_extra_ghost_elems.end(), this->elem_ptr(elem_id));
-  }
-  // End loop over elements in the other mesh
-}
-
-
 DistributedMesh::~DistributedMesh ()
 {
   this->clear();  // Free nodes and elements

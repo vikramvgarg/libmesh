@@ -80,12 +80,6 @@ public:
   virtual MeshBase & operator= (MeshBase && other_mesh) override;
 
   /**
-   * Assignment function, will move argument onto the MeshBase object.
-   * Definition in derived classes.
-   */
-  virtual void assign (MeshBase & other_mesh) override;
-
-  /**
    * Destructor.
    */
   virtual ~UnstructuredMesh();
