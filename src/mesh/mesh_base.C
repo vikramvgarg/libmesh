@@ -142,6 +142,27 @@ MeshBase::MeshBase (const MeshBase & other_mesh) :
     _partitioner = other_mesh._partitioner->clone();
 }
 
+MeshBase& MeshBase::operator= (MeshBase && other_mesh)
+{
+  _n_parts = std::move(other_mesh.n_partitions());
+  _default_mapping_type = std::move(other_mesh.default_mapping_type());
+  _default_mapping_data = std::move(other_mesh.default_mapping_data());
+  _is_prepared = std::move(other_mesh.is_prepared());
+  _count_lower_dim_elems_in_point_locator = std::move(other_mesh.get_count_lower_dim_elems_in_point_locator());
+  #ifdef LIBMESH_ENABLE_UNIQUE_ID
+    _next_unique_id = std::move(other_mesh.next_unique_id());
+  #endif
+  _skip_noncritical_partitioning = std::move(other_mesh.skip_noncritical_partitioning());
+  _skip_renumber_nodes_and_elements = std::move(!(other_mesh.allow_renumbering()));
+  _skip_find_neighbors = std::move(!(other_mesh.allow_find_neighbors()));
+  _allow_remote_element_removal = std::move(other_mesh.allow_remote_element_removal());
+  _elem_dims = std::move(other_mesh.elem_dimensions());
+  _spatial_dimension = std::move(other_mesh.spatial_dimension());
+  _point_locator_close_to_point_tol = std::move(other_mesh.get_point_locator_close_to_point_tol());
+
+  return *this;
+}
+
 MeshBase::~MeshBase()
 {
   this->clear();
