@@ -55,6 +55,62 @@ UnstructuredMesh::UnstructuredMesh (const Parallel::Communicator & comm_in,
   libmesh_assert (libMesh::initialized());
 }
 
+MeshBase & UnstructuredMesh::operator= (MeshBase && other_mesh)
+{
+  // First make a call to MeshBase::clear
+  this->MeshBase::clear();
+
+  this->ParallelObject::operator=(other_mesh);
+
+  // First set this mesh equal to other_mesh as a MeshBase.
+  this->MeshBase::operator=(std::move(other_mesh));
+
+  this->copy_nodes_and_elements(dynamic_cast<UnstructuredMesh &>(other_mesh), true);
+
+  this->get_boundary_info() = std::move(other_mesh.get_boundary_info());
+
+  this->set_subdomain_name_map() = std::move(other_mesh.get_subdomain_name_map());
+
+  const GhostingFunctor * const other_default_ghosting = std::move(&(other_mesh.default_ghosting()));
+
+  std::set<GhostingFunctor *>::const_iterator other_mesh_gf_begin_it = std::move(other_mesh.ghosting_functors_begin());
+  std::set<GhostingFunctor *>::const_iterator other_mesh_gf_end_it = std::move(other_mesh.ghosting_functors_end());
+
+  for (auto gf = other_mesh_gf_begin_it; gf != other_mesh_gf_end_it; ++gf )
+    {
+      // If the other mesh is using default ghosting, then we will use our own
+      // default ghosting
+      if (*gf == other_default_ghosting)
+        {
+          _ghosting_functors.insert(_default_ghosting.get());
+          continue;
+        }
+
+      std::shared_ptr<GhostingFunctor> clone_gf = (*gf)->clone();
+      // Some subclasses of GhostingFunctor might not override the
+      // clone function yet. If this is the case, GhostingFunctor will
+      // return nullptr by default. The clone function should be overridden
+      // in all derived classes. This following code ("else") is written
+      // for API upgrade. That will allow users gradually to update their code.
+      // Once the API upgrade is done, we will come back and delete "else."
+      if (clone_gf)
+        {
+          clone_gf->set_mesh(this);
+          add_ghosting_functor(clone_gf);
+        }
+      else
+        {
+          libmesh_deprecated();
+          add_ghosting_functor(*(*gf));
+        }
+    }
+
+  if (other_mesh.partitioner())
+    _partitioner = std::move((other_mesh.partitioner())->clone());
+
+  return *this;
+}
+
 void UnstructuredMesh::assign (MeshBase & other_mesh)
 {
   // First make a call to MeshBase::clear

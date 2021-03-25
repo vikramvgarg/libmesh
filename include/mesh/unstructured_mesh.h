@@ -69,10 +69,15 @@ public:
   UnstructuredMesh(UnstructuredMesh &&) = delete;
 
   /**
-   * Copy and move assignment are not allowed.
+   * Copy assignment is not allowed.
    */
   UnstructuredMesh & operator= (const UnstructuredMesh &) = delete;
-  UnstructuredMesh & operator= (UnstructuredMesh &&) = delete;
+
+  /**
+   * Overloaded operator= will move contents of other_mesh to calling
+   * MeshBase object if an rvalue argument is provided.
+   */
+  virtual MeshBase & operator= (MeshBase && other_mesh) override;
 
   /**
    * Assignment function, will move argument onto the MeshBase object.
