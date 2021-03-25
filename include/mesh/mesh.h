@@ -82,7 +82,12 @@ public:
    * Copy and move assignment are not allowed.
    */
   Mesh & operator= (const Mesh &) = delete;
-  Mesh & operator= (Mesh &&) = delete;
+
+  /**
+   * Use the equality operator of the base DefaultMesh class
+   * if an rvalue argument is provided.
+   */
+  using DefaultMesh::operator=;
 };
 
 

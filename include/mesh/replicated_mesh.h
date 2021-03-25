@@ -77,7 +77,12 @@ public:
    * Copy and move assignment are not allowed.
    */
   ReplicatedMesh & operator= (const ReplicatedMesh &) = delete;
-  ReplicatedMesh & operator= (ReplicatedMesh &&) = delete;
+
+  /**
+   * Use the equality operator of the base UnstructuredMesh class
+   * if an rvalue argument is provided.
+   */
+  using UnstructuredMesh::operator=;
 
   /**
    * Virtual copy-constructor, creates a copy of this mesh
