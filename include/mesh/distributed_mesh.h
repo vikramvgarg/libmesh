@@ -81,7 +81,12 @@ public:
    * Copy and move assignment are not allowed.
    */
   DistributedMesh & operator= (const DistributedMesh &) = delete;
-  DistributedMesh & operator= (DistributedMesh &&) = delete;
+
+  /**
+   * Overloaded operator= will move contents of other_mesh to calling
+   * MeshBase object.
+   */
+  virtual MeshBase & operator= (MeshBase && other_mesh) override;
 
   /**
    * Virtual copy-constructor, creates a copy of this mesh
