@@ -260,7 +260,7 @@ public:
       bi.nodeset_name(0) = "ZERO";
       bi.nodeset_name(1) = "ONE";
 
-      BoundaryInfo bi2 {bi};
+      BoundaryInfo & bi2 (bi);
       CPPUNIT_ASSERT_EQUAL(bi2.get_sideset_name(0), std::string("zero"));
       CPPUNIT_ASSERT_EQUAL(bi2.get_sideset_name(1), std::string("one"));
       CPPUNIT_ASSERT_EQUAL(bi2.get_sideset_name(2), std::string("two"));
