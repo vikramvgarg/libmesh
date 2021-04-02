@@ -84,10 +84,14 @@ public:
   Mesh & operator= (const Mesh &) = delete;
 
   /**
-   * Use the equality operator of the base DefaultMesh class
-   * if an rvalue argument is provided.
+   * Provides move functionality via base class move assignment operator.
    */
-  using DefaultMesh::operator=;
+  virtual MeshBase & assign(MeshBase && other_mesh) override
+  {
+    *(libmesh_cast_ptr<DefaultMesh*>(this)) = std::move(*(libmesh_cast_ptr<DefaultMesh*>(&other_mesh)));
+
+    return *this;
+  }
 };
 
 

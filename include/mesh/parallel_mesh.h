@@ -41,12 +41,6 @@ public:
 
   ParallelMesh (const UnstructuredMesh & other_mesh) : DistributedMesh(other_mesh) {}
 
-  /**
-   * Use the equality operator of the base DistributedMesh class
-   * if an rvalue argument is provided.
-   */
-  using DistributedMesh::operator=;
-
   virtual std::unique_ptr<MeshBase> clone () const override
   { return libmesh_make_unique<ParallelMesh>(*this); }
 

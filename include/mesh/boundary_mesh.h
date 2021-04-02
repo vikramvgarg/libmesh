@@ -51,11 +51,6 @@ public:
    */
   ~BoundaryMesh();
 
-  /**
-   * Use the equality operator of the base Mesh class
-   * if an rvalue argument is provided.
-   */
-  using Mesh::operator=;
 };
 
 } // namespace libMesh

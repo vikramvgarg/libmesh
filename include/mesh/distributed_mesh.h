@@ -84,9 +84,19 @@ public:
 
   /**
    * Overloaded operator= will move contents of other_mesh to calling
-   * MeshBase object.
+   * DistributedMesh object.
    */
-  virtual MeshBase & operator= (MeshBase && other_mesh) override;
+  DistributedMesh & operator= (DistributedMesh && other_mesh);
+
+  /**
+   * Shim to call the move assignment operator for this class
+  */
+  virtual MeshBase & assign(MeshBase && other_mesh) override
+  {
+    *this = std::move(*(libmesh_cast_ptr<DistributedMesh*>(&other_mesh)));
+
+    return *this;
+  }
 
   /**
    * Virtual copy-constructor, creates a copy of this mesh

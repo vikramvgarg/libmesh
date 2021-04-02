@@ -77,7 +77,9 @@ public:
    * Overloaded operator= will move contents of other_mesh to calling
    * MeshBase object if an rvalue argument is provided.
    */
-  virtual MeshBase & operator= (MeshBase && other_mesh) override;
+  UnstructuredMesh & operator= (UnstructuredMesh && other_mesh);
+
+  virtual MeshBase & assign(MeshBase && other_mesh) override = 0;
 
   /**
    * Destructor.

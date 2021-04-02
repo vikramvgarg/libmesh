@@ -146,7 +146,7 @@ public:
 
       // Move mesh_two into mesh_one
       system.get_mesh().clear();
-      system.get_mesh() = std::move(*mesh_two);
+      system.get_mesh().assign(std::move(*mesh_two));
 
       // Assert that the moved into mesh has the right number of elements.
       CPPUNIT_ASSERT_EQUAL(system.get_mesh().n_elem(), dof_id_type(20));

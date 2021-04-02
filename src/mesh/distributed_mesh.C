@@ -58,44 +58,49 @@ DistributedMesh::DistributedMesh (const Parallel::Communicator & comm_in,
   _partitioner = libmesh_make_unique<ParmetisPartitioner>();
 }
 
-MeshBase & DistributedMesh::operator= (MeshBase && other_mesh)
+DistributedMesh & DistributedMesh::operator= (DistributedMesh && other_mesh)
 {
-  // First set this mesh equal to other_mesh as an UnstructuredMesh.
+  /** The order of base class assignment operator calls needs some explanation.
+   * Ordinarily, we would call UnstructuredMesh::operator= in this function, which would
+   * then call MeshBase::operator= as per the class hierarchy order. However, this is upset
+   * by the need to move BoundaryInfo, which is a member of MeshBase, but can only
+   * be moved properly in UnstructuredMesh after nodes and elements have been moved in
+   * DistributedMesh. And before we can move any of those, we need to call MeshBase's
+   * assignment operator, which moves data pertaining to mesh prepardness, dimension etc.
+   * So we first move the MeshBase data, then move nodes and elements, followed by
+   * UnstructuredMesh data and then the remaining work for DistributedMesh.
+   */
+
+  // First make a call to MeshBase::clear
+  this->MeshBase::clear();
+
+  // Move assign as a MeshBase.
+  this->MeshBase::operator=(std::move(other_mesh));
+
+  // Nodes and elements belong to DistributedMesh and have to be
+  // moved before we can move the BoundaryInfo object in UnstructuredMesh::operator=.
+  this->move_nodes_and_elements(std::move(other_mesh));
+
+  // Move assign as an UnstructuredMesh.
   this->UnstructuredMesh::operator=(std::move(other_mesh));
 
-  _is_serial = std::move(reinterpret_cast<DistributedMesh &>(other_mesh).is_serial());
-  _is_serial_on_proc_0 = std::move(reinterpret_cast<DistributedMesh &>(other_mesh).is_serial_on_zero());
+  // The remaining work to move a DistributedMesh
+  _is_serial = other_mesh.is_serial();
+  _is_serial_on_proc_0 = other_mesh.is_serial_on_zero();
 
-  _n_nodes = std::move(reinterpret_cast<DistributedMesh &>(other_mesh).n_nodes());
-  _n_elem = std::move(reinterpret_cast<DistributedMesh &>(other_mesh).n_elem());
-  _max_node_id = std::move(reinterpret_cast<DistributedMesh &>(other_mesh).max_node_id());
-  _max_elem_id = std::move(reinterpret_cast<DistributedMesh &>(other_mesh).max_elem_id());
+  _max_node_id = other_mesh.max_node_id();
+  _max_elem_id = other_mesh.max_elem_id();
 
-  _next_free_local_node_id = std::move(reinterpret_cast<DistributedMesh &>(other_mesh)._next_free_local_node_id);
-  _next_free_local_elem_id = std::move(reinterpret_cast<DistributedMesh &>(other_mesh)._next_free_local_elem_id);
-  _next_free_unpartitioned_node_id = std::move(reinterpret_cast<DistributedMesh &>(other_mesh)._next_free_unpartitioned_node_id);
-  _next_free_unpartitioned_elem_id = std::move(reinterpret_cast<DistributedMesh &>(other_mesh)._next_free_unpartitioned_elem_id);
+  _next_free_local_node_id = other_mesh._next_free_local_node_id;
+  _next_free_local_elem_id = other_mesh._next_free_local_elem_id;
+  _next_free_unpartitioned_node_id = other_mesh._next_free_unpartitioned_node_id;
+  _next_free_unpartitioned_elem_id = other_mesh._next_free_unpartitioned_elem_id;
 
   #ifdef LIBMESH_ENABLE_UNIQUE_ID
-  _next_unpartitioned_unique_id = std::move(reinterpret_cast<DistributedMesh &>(other_mesh)._next_unpartitioned_unique_id);
+  _next_unpartitioned_unique_id = other_mesh._next_unpartitioned_unique_id;
   #endif
 
-  // Loop over all elems in the other_mesh's set and set _extra_ghost_elems
-  // elementwise to the element with the same id in the new mesh
-  std::set<Elem *>::iterator it_other_mesh;
-  unsigned int elem_id;
-
-  // Begin loop over elements in the other mesh's set
-  for(it_other_mesh = reinterpret_cast<DistributedMesh &>(other_mesh)._extra_ghost_elems.begin(); it_other_mesh != reinterpret_cast<DistributedMesh &>(other_mesh)._extra_ghost_elems.end(); it_other_mesh++)
-  {
-    // Find the id corresponding to the current elem * in the set
-    elem_id = std::move((*it_other_mesh)->id());
-
-    // Get the elem * corresponding to the above id in the new mesh
-    // and insert it in the _extra_ghost_elems member of the new mesh
-    _extra_ghost_elems.insert(_extra_ghost_elems.end(), this->elem_ptr(elem_id));
-  }
-  // End loop over elements in the other mesh
+  _extra_ghost_elems = std::move(other_mesh._extra_ghost_elems);
 
   return *this;
 }

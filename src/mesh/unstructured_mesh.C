@@ -55,58 +55,48 @@ UnstructuredMesh::UnstructuredMesh (const Parallel::Communicator & comm_in,
   libmesh_assert (libMesh::initialized());
 }
 
-MeshBase & UnstructuredMesh::operator= (MeshBase && other_mesh)
+UnstructuredMesh & UnstructuredMesh::operator= (UnstructuredMesh && other_mesh)
 {
-  // First make a call to MeshBase::clear
-  this->MeshBase::clear();
-
-  this->ParallelObject::operator=(other_mesh);
-
-  // First set this mesh equal to other_mesh as a MeshBase.
-  this->MeshBase::operator=(std::move(other_mesh));
-
-  this->copy_nodes_and_elements(dynamic_cast<UnstructuredMesh &>(other_mesh), true);
-
+  // Nodes and elements have to be moved in derived classes before we can move the BoundaryInfo object here.
   this->get_boundary_info() = std::move(other_mesh.get_boundary_info());
 
   this->set_subdomain_name_map() = std::move(other_mesh.get_subdomain_name_map());
 
-  const GhostingFunctor * const other_default_ghosting = std::move(&(other_mesh.default_ghosting()));
+  // Now that all the BoundaryInfo moving is done, we can move the GhostingFunctor objects
+  // which include the _default_ghosting,_ghosting_functors and _shared_functors. We also need
+  // to set the mesh object associated with these functors to the assignee mesh.
 
-  std::set<GhostingFunctor *>::const_iterator other_mesh_gf_begin_it = std::move(other_mesh.ghosting_functors_begin());
-  std::set<GhostingFunctor *>::const_iterator other_mesh_gf_end_it = std::move(other_mesh.ghosting_functors_end());
+   // _default_ghosting
+  _default_ghosting = std::move(other_mesh._default_ghosting);
+  _default_ghosting->set_mesh(this);
 
-  for (auto gf = other_mesh_gf_begin_it; gf != other_mesh_gf_end_it; ++gf )
-    {
-      // If the other mesh is using default ghosting, then we will use our own
-      // default ghosting
-      if (*gf == other_default_ghosting)
-        {
-          _ghosting_functors.insert(_default_ghosting.get());
-          continue;
-        }
+  // _ghosting_functors
+  _ghosting_functors = std::move(other_mesh._ghosting_functors);
 
-      std::shared_ptr<GhostingFunctor> clone_gf = (*gf)->clone();
-      // Some subclasses of GhostingFunctor might not override the
-      // clone function yet. If this is the case, GhostingFunctor will
-      // return nullptr by default. The clone function should be overridden
-      // in all derived classes. This following code ("else") is written
-      // for API upgrade. That will allow users gradually to update their code.
-      // Once the API upgrade is done, we will come back and delete "else."
-      if (clone_gf)
-        {
-          clone_gf->set_mesh(this);
-          add_ghosting_functor(clone_gf);
-        }
-      else
-        {
-          libmesh_deprecated();
-          add_ghosting_functor(*(*gf));
-        }
-    }
+  std::set<GhostingFunctor *>::const_iterator gf_begin_it = _ghosting_functors.begin();
+  std::set<GhostingFunctor *>::const_iterator gf_end_it = _ghosting_functors.end();
+
+  for (auto gf = gf_begin_it; gf != gf_end_it; ++gf )
+  {
+    (*gf)->set_mesh(this);
+  }
+
+  // _shared_functors
+  _shared_functors = std::move(other_mesh._shared_functors);
+
+  std::map<GhostingFunctor *, std::shared_ptr<GhostingFunctor>>::const_iterator sf_begin_it = _shared_functors.begin();
+  std::map<GhostingFunctor *, std::shared_ptr<GhostingFunctor>>::iterator sf_end_it = _shared_functors.end();
+
+  for (auto sf = sf_begin_it; sf != sf_end_it; sf++ )
+  {
+    (sf->second)->set_mesh(this);
+  }
+
+  // _constraint_rows
+  _constraint_rows = std::move(other_mesh._constraint_rows);
 
   if (other_mesh.partitioner())
-    _partitioner = std::move((other_mesh.partitioner())->clone());
+    _partitioner = std::move(other_mesh.partitioner());
 
   return *this;
 }

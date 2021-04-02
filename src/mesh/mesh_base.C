@@ -144,21 +144,31 @@ MeshBase::MeshBase (const MeshBase & other_mesh) :
 
 MeshBase& MeshBase::operator= (MeshBase && other_mesh)
 {
-  _n_parts = std::move(other_mesh.n_partitions());
-  _default_mapping_type = std::move(other_mesh.default_mapping_type());
-  _default_mapping_data = std::move(other_mesh.default_mapping_data());
-  _is_prepared = std::move(other_mesh.is_prepared());
-  _count_lower_dim_elems_in_point_locator = std::move(other_mesh.get_count_lower_dim_elems_in_point_locator());
+  // Move assign as a ParallelObject.
+  this->ParallelObject::operator=(other_mesh);
+
+  _n_parts = other_mesh.n_partitions();
+  _default_mapping_type = other_mesh.default_mapping_type();
+  _default_mapping_data = other_mesh.default_mapping_data();
+  _is_prepared = other_mesh.is_prepared();
+  _point_locator = std::move(other_mesh._point_locator);
+  _count_lower_dim_elems_in_point_locator = other_mesh.get_count_lower_dim_elems_in_point_locator();
   #ifdef LIBMESH_ENABLE_UNIQUE_ID
-    _next_unique_id = std::move(other_mesh.next_unique_id());
+    _next_unique_id = other_mesh.next_unique_id();
   #endif
-  _skip_noncritical_partitioning = std::move(other_mesh.skip_noncritical_partitioning());
-  _skip_renumber_nodes_and_elements = std::move(!(other_mesh.allow_renumbering()));
-  _skip_find_neighbors = std::move(!(other_mesh.allow_find_neighbors()));
-  _allow_remote_element_removal = std::move(other_mesh.allow_remote_element_removal());
+  _skip_noncritical_partitioning = other_mesh.skip_noncritical_partitioning();
+  _skip_all_partitioning = other_mesh.skip_partitioning();
+  _skip_renumber_nodes_and_elements = !(other_mesh.allow_renumbering());
+  _skip_find_neighbors = !(other_mesh.allow_find_neighbors());
+  _allow_remote_element_removal = other_mesh.allow_remote_element_removal();
+  _block_id_to_name = std::move(other_mesh._block_id_to_name);
   _elem_dims = std::move(other_mesh.elem_dimensions());
-  _spatial_dimension = std::move(other_mesh.spatial_dimension());
-  _point_locator_close_to_point_tol = std::move(other_mesh.get_point_locator_close_to_point_tol());
+  _spatial_dimension = other_mesh.spatial_dimension();
+  _elem_integer_names = std::move(other_mesh._elem_integer_names);
+  _elem_integer_default_values = std::move(other_mesh._elem_integer_default_values);
+  _node_integer_names = std::move(other_mesh._node_integer_names);
+  _node_integer_default_values = std::move(other_mesh._node_integer_default_values);
+  _point_locator_close_to_point_tol = other_mesh.get_point_locator_close_to_point_tol();
 
   return *this;
 }

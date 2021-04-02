@@ -110,7 +110,13 @@ public:
    * If you need to copy a Mesh, use the clone() method.
    */
   MeshBase & operator= (const MeshBase &) = delete;
-  virtual MeshBase & operator= (MeshBase && other_mesh);
+  MeshBase & operator= (MeshBase && other_mesh);
+
+  /**
+   * Shim to allow operator = (&&) to behave like a virtual function
+   * without having to be one.
+   */
+  virtual MeshBase & assign(MeshBase && other_mesh) = 0;
 
   /**
    * Virtual "copy constructor"
