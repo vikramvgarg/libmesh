@@ -175,6 +175,11 @@ public:
                                         dof_id_type node_id_offset = 0,
                                         unique_id_type unique_id_offset = 0);
 
+  /**
+   * Move node and elements from other_mesh to this mesh.
+   */
+  virtual void move_nodes_and_elements(MeshBase && other_mesh) = 0;
+
 
   /**
    * Other functions from MeshBase requiring re-definition.

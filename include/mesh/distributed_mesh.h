@@ -99,6 +99,11 @@ public:
   }
 
   /**
+   * Move node and elements from other_mesh to this mesh.
+   */
+  virtual void move_nodes_and_elements(MeshBase && other_mesh) override;
+
+  /**
    * Virtual copy-constructor, creates a copy of this mesh
    */
   virtual std::unique_ptr<MeshBase> clone () const override

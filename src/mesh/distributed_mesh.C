@@ -218,6 +218,14 @@ DistributedMesh::DistributedMesh (const UnstructuredMesh & other_mesh) :
   this->update_parallel_id_counts();
 }
 
+void DistributedMesh::move_nodes_and_elements(MeshBase && other_mesh)
+{
+  this->_nodes = std::move((libmesh_cast_ptr<DistributedMesh*>(&other_mesh))->_nodes);
+  this->_n_nodes = other_mesh.n_nodes();
+
+  this->_elements = std::move((libmesh_cast_ptr<DistributedMesh*>(&other_mesh))->_elements);
+  this->_n_elem = other_mesh.n_elem();
+}
 
 // We use cached values for these so they can be called
 // from one processor without bothering the rest, but

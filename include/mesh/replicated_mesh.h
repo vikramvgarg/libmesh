@@ -82,8 +82,7 @@ public:
    * Use the equality operator of the base UnstructuredMesh class
    * if an rvalue argument is provided.
   */
-  ReplicatedMesh & operator= (ReplicatedMesh && other_mesh)
-  { this->UnstructuredMesh::operator=(std::move(other_mesh)); return *this; }
+  ReplicatedMesh & operator= (ReplicatedMesh && other_mesh);
 
   /**
    * Shim to call the move assignment operator for this class
@@ -94,6 +93,11 @@ public:
 
     return *this;
   }
+
+  /**
+   * Move node and elements from other_mesh to this mesh.
+   */
+  virtual void move_nodes_and_elements(MeshBase && other_mesh) override;
 
   /**
    * Virtual copy-constructor, creates a copy of this mesh
