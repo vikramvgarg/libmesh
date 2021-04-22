@@ -74,28 +74,22 @@ public:
   ReplicatedMesh(ReplicatedMesh &&) = delete;
 
   /**
-   * Copy and move assignment are not allowed.
+   * Copy assignment is not allowed.
    */
   ReplicatedMesh & operator= (const ReplicatedMesh &) = delete;
 
   /**
-   * Use the equality operator of the base UnstructuredMesh class
-   * if an rvalue argument is provided.
+   * Move assignment operator.
   */
   ReplicatedMesh & operator= (ReplicatedMesh && other_mesh);
 
   /**
    * Shim to call the move assignment operator for this class
   */
-  virtual MeshBase & assign(MeshBase && other_mesh) override
-  {
-    *this = std::move(*(cast_ptr<ReplicatedMesh*>(&other_mesh)));
-
-    return *this;
-  }
+  virtual MeshBase & assign(MeshBase && other_mesh) override;
 
   /**
-   * Move node and elements from other_mesh to this mesh.
+   * Move node and elements from a ReplicatedMesh.
    */
   virtual void move_nodes_and_elements(MeshBase && other_mesh) override;
 

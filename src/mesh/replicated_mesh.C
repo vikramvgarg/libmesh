@@ -189,6 +189,12 @@ ReplicatedMesh & ReplicatedMesh::operator= (ReplicatedMesh && other_mesh)
   return *this;
 }
 
+MeshBase & ReplicatedMesh::assign(MeshBase && other_mesh)
+{
+  *this = std::move(*(cast_ptr<ReplicatedMesh*>(&other_mesh)));
+
+  return *this;
+}
 
 void ReplicatedMesh::move_nodes_and_elements(MeshBase && other_mesh)
 {
