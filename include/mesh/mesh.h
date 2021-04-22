@@ -83,15 +83,6 @@ public:
    */
   Mesh & operator= (const Mesh &) = delete;
 
-  /**
-   * Provides move functionality via base class move assignment operator.
-   */
-  virtual MeshBase & assign(MeshBase && other_mesh) override
-  {
-    *(cast_ptr<DefaultMesh*>(this)) = std::move(*(cast_ptr<DefaultMesh*>(&other_mesh)));
-
-    return *this;
-  }
 };
 
 
