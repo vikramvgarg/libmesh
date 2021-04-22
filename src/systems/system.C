@@ -297,10 +297,6 @@ void System::init_data ()
 
 void System::reinit_mesh ()
 {
-  // Calling init() twice on the same system currently works evil
-  // magic, whether done directly or via EquationSystems::read()
-  //libmesh_assert(!this->is_initialized());
-
   // First initialize any required data:
   // either only the basic System data
   if (_basic_system_only)
@@ -317,81 +313,6 @@ void System::reinit_mesh ()
   // Then call the user-provided initialization function
   this->user_initialization();
 
-
-  MeshBase & mesh = this->get_mesh();
-
-  // Add all variable groups to our underlying DofMap
-  for (auto vg : make_range(this->n_variable_groups()))
-    _dof_map->add_variable_group(this->variable_group(vg));
-
-  // Distribute the degrees of freedom on the mesh
-  auto total_dofs = _dof_map->distribute_dofs (mesh);
-
-  // Throw an error if the total number of DOFs is not capable of
-  // being indexed by our solution vector.
-  auto max_allowed_id = solution->max_allowed_id();
-  libmesh_error_msg_if(total_dofs > max_allowed_id,
-                       "Cannot allocate a NumericVector with " << total_dofs << " degrees of freedom. "
-                       "The vector can only index up to " << max_allowed_id << " entries.");
-
-  // Recreate any user or internal constraints
-  this->reinit_constraints();
-
-  // And clean up the send_list before we first use it
-  _dof_map->prepare_send_list();
-
-  // Resize the solution conformal to the current mesh
-  solution->init (this->n_dofs(), this->n_local_dofs(), false, PARALLEL);
-
-  // Resize the current_local_solution for the current mesh
-#ifdef LIBMESH_ENABLE_GHOSTED
-  current_local_solution->init (this->n_dofs(), this->n_local_dofs(),
-                                _dof_map->get_send_list(), false,
-                                GHOSTED);
-#else
-  current_local_solution->init (this->n_dofs(), false, SERIAL);
-#endif
-
-  // from now on, adding additional vectors or variables can't be done
-  // without immediately initializing them
-  _is_initialized = true;
-
-  // initialize & zero other vectors, if necessary
-  for (auto & pr : _vectors)
-    {
-      ParallelType type = _vector_types[pr.first];
-
-      if (type == GHOSTED)
-        {
-#ifdef LIBMESH_ENABLE_GHOSTED
-          pr.second->init (this->n_dofs(), this->n_local_dofs(),
-                           _dof_map->get_send_list(), false,
-                           GHOSTED);
-#else
-          libmesh_error_msg("Cannot initialize ghosted vectors when they are not enabled.");
-#endif
-        }
-      else if (type == SERIAL)
-        {
-          pr.second->init (this->n_dofs(), false, type);
-        }
-      else
-        {
-          libmesh_assert_equal_to(type, PARALLEL);
-          pr.second->init (this->n_dofs(), this->n_local_dofs(), false, type);
-        }
-    }
-
-  // Add matrices
-  this->add_matrices();
-
-  // Clear any existing matrices
-  for (auto & pr : _matrices)
-    pr.second->clear();
-
-  // Initialize the matrices for the system
-  if (!_basic_system_only)
-   this->init_matrices();
 }
 
 void System::init_matrices ()
