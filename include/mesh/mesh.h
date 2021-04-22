@@ -88,7 +88,7 @@ public:
    */
   virtual MeshBase & assign(MeshBase && other_mesh) override
   {
-    *(libmesh_cast_ptr<DefaultMesh*>(this)) = std::move(*(libmesh_cast_ptr<DefaultMesh*>(&other_mesh)));
+    *(cast_ptr<DefaultMesh*>(this)) = std::move(*(cast_ptr<DefaultMesh*>(&other_mesh)));
 
     return *this;
   }

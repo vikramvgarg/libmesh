@@ -220,10 +220,10 @@ DistributedMesh::DistributedMesh (const UnstructuredMesh & other_mesh) :
 
 void DistributedMesh::move_nodes_and_elements(MeshBase && other_mesh)
 {
-  this->_nodes = std::move((libmesh_cast_ptr<DistributedMesh*>(&other_mesh))->_nodes);
+  this->_nodes = std::move((cast_ptr<DistributedMesh*>(&other_mesh))->_nodes);
   this->_n_nodes = other_mesh.n_nodes();
 
-  this->_elements = std::move((libmesh_cast_ptr<DistributedMesh*>(&other_mesh))->_elements);
+  this->_elements = std::move((cast_ptr<DistributedMesh*>(&other_mesh))->_elements);
   this->_n_elem = other_mesh.n_elem();
 }
 
