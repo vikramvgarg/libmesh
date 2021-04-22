@@ -254,12 +254,6 @@ public:
   virtual dof_id_type max_elem_id () const override { return _max_elem_id; }
   virtual void reserve_elem (const dof_id_type) override {}
 
-  // Accessors for dof_id_type variables specific to this class
-  dof_id_type next_free_local_node_id(){return _next_free_local_node_id;}
-  dof_id_type next_free_local_elem_id(){return _next_free_local_elem_id;}
-  dof_id_type next_free_unpartitioned_node_id(){return _next_free_unpartitioned_node_id;}
-  dof_id_type next_free_unpartitioned_elem_id(){return _next_free_unpartitioned_elem_id;}
-
   // Parallel only method to update the caches
   virtual void update_parallel_id_counts () override;
 
