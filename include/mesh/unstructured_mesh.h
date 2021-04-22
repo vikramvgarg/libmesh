@@ -74,10 +74,10 @@ public:
   UnstructuredMesh & operator= (const UnstructuredMesh &) = delete;
 
   /**
-   * Overloaded operator= will move contents of other_mesh to calling
-   * MeshBase object if an rvalue argument is provided.
+   * Move assignment is allowed, by subclasses who handle
+   * post_dofobject_moves()
    */
-  UnstructuredMesh & operator= (UnstructuredMesh && other_mesh);
+  UnstructuredMesh & operator= (UnstructuredMesh && other_mesh) = default;
 
   virtual MeshBase & assign(MeshBase && other_mesh) override = 0;
 

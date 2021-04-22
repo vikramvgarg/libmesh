@@ -175,29 +175,16 @@ ReplicatedMesh::ReplicatedMesh (const UnstructuredMesh & other_mesh) :
 
 ReplicatedMesh & ReplicatedMesh::operator= (ReplicatedMesh && other_mesh)
 {
-  /** The order of base class assignment operator calls needs some explanation.
-   * Ordinarily, we would call UnstructuredMesh::operator= in this function, which would
-   * then call MeshBase::operator= as per the class hierarchy order. However, this is upset
-   * by the need to move BoundaryInfo, which is a member of MeshBase, but can only
-   * be moved properly in UnstructuredMesh after nodes and elements have been moved in
-   * ReplicatedMesh. And before we can move any of those, we need to call MeshBase's
-   * assignment operator, which moves data pertaining to mesh prepardness, dimension etc.
-   * So we first move the MeshBase data, then move nodes and elements, followed by
-   * UnstructuredMesh data.
-   */
-
-  // First make a call to MeshBase::clear
-  this->MeshBase::clear();
-
-  // Move assign as a MeshBase.
-  this->MeshBase::operator=(std::move(other_mesh));
+  // Move assign as an UnstructuredMesh
+  this->UnstructuredMesh::operator=(std::move(other_mesh));
 
   // Nodes and elements belong to ReplicatedMesh and have to be
-  // moved before we can move the BoundaryInfo object in UnstructuredMesh::operator=.
+  // moved before we can move arbitrary GhostingFunctor, Partitioner,
+  // etc. subclasses.
   this->move_nodes_and_elements(std::move(other_mesh));
 
-  // Move assign as an UnstructuredMesh.
-  this->UnstructuredMesh::operator=(std::move(other_mesh));
+  // Handle those remaining moves.
+  this->post_dofobject_moves(std::move(other_mesh));
 
   return *this;
 }

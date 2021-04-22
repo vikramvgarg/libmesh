@@ -1751,6 +1751,15 @@ protected:
 
 
 protected:
+  /**
+   * Moves any superclass data (e.g. GhostingFunctors that might rely
+   * on element and nodal data (which is managed by subclasses!)
+   * being already moved first.
+   *
+   * Must be manually called in dofobject-managing subclass move
+   * operators.
+   */
+  void post_dofobject_moves(MeshBase && other_mesh);
 
   /**
    * \returns A writable reference to the number of partitions.

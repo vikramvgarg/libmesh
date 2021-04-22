@@ -170,8 +170,19 @@ MeshBase& MeshBase::operator= (MeshBase && other_mesh)
   _node_integer_default_values = std::move(other_mesh._node_integer_default_values);
   _point_locator_close_to_point_tol = other_mesh.get_point_locator_close_to_point_tol();
 
+  // This relies on our subclasses *not* invalidating pointers when we
+  // do their portion of the move assignment later!
+  boundary_info = std::move(other_mesh.boundary_info);
+  boundary_info->set_mesh(*this);
+
+  // We're *not* really done at this point, but we have the problem
+  // that some of our data movement might be expecting subclasses data
+  // movement to happen first.  We'll let subclasses handle that by
+  // calling our post_dofobject_moves()
   return *this;
 }
+
+
 
 MeshBase::~MeshBase()
 {
@@ -1547,6 +1558,48 @@ MeshBase::merge_extra_integer_names(const MeshBase & other)
   returnval.first = this->add_elem_integers(other._elem_integer_names, true, &other._elem_integer_default_values);
   returnval.second = this->add_node_integers(other._node_integer_names, true, &other._node_integer_default_values);
   return returnval;
+}
+
+
+
+void
+MeshBase::post_dofobject_moves(MeshBase && other_mesh)
+{
+  // Now that all the DofObject moving is done, we can move the GhostingFunctor objects
+  // which include the _default_ghosting,_ghosting_functors and _shared_functors. We also need
+  // to set the mesh object associated with these functors to the assignee mesh.
+
+   // _default_ghosting
+  _default_ghosting = std::move(other_mesh._default_ghosting);
+  _default_ghosting->set_mesh(this);
+
+  // _ghosting_functors
+  _ghosting_functors = std::move(other_mesh._ghosting_functors);
+
+  std::set<GhostingFunctor *>::const_iterator gf_begin_it = _ghosting_functors.begin();
+  std::set<GhostingFunctor *>::const_iterator gf_end_it = _ghosting_functors.end();
+
+  for (auto gf = gf_begin_it; gf != gf_end_it; ++gf )
+  {
+    (*gf)->set_mesh(this);
+  }
+
+  // _shared_functors
+  _shared_functors = std::move(other_mesh._shared_functors);
+
+  std::map<GhostingFunctor *, std::shared_ptr<GhostingFunctor>>::const_iterator sf_begin_it = _shared_functors.begin();
+  std::map<GhostingFunctor *, std::shared_ptr<GhostingFunctor>>::iterator sf_end_it = _shared_functors.end();
+
+  for (auto sf = sf_begin_it; sf != sf_end_it; sf++ )
+  {
+    (sf->second)->set_mesh(this);
+  }
+
+  // _constraint_rows
+  _constraint_rows = std::move(other_mesh._constraint_rows);
+
+  if (other_mesh.partitioner())
+    _partitioner = std::move(other_mesh.partitioner());
 }
 
 

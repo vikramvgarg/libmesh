@@ -60,47 +60,18 @@ DistributedMesh::DistributedMesh (const Parallel::Communicator & comm_in,
 
 DistributedMesh & DistributedMesh::operator= (DistributedMesh && other_mesh)
 {
-  /** The order of base class assignment operator calls needs some explanation.
-   * Ordinarily, we would call UnstructuredMesh::operator= in this function, which would
-   * then call MeshBase::operator= as per the class hierarchy order. However, this is upset
-   * by the need to move BoundaryInfo, which is a member of MeshBase, but can only
-   * be moved properly in UnstructuredMesh after nodes and elements have been moved in
-   * DistributedMesh. And before we can move any of those, we need to call MeshBase's
-   * assignment operator, which moves data pertaining to mesh prepardness, dimension etc.
-   * So we first move the MeshBase data, then move nodes and elements, followed by
-   * UnstructuredMesh data and then the remaining work for DistributedMesh.
-   */
-
-  // First make a call to MeshBase::clear
-  this->MeshBase::clear();
-
-  // Move assign as a MeshBase.
-  this->MeshBase::operator=(std::move(other_mesh));
-
-  // Nodes and elements belong to DistributedMesh and have to be
-  // moved before we can move the BoundaryInfo object in UnstructuredMesh::operator=.
-  this->move_nodes_and_elements(std::move(other_mesh));
-
   // Move assign as an UnstructuredMesh.
   this->UnstructuredMesh::operator=(std::move(other_mesh));
 
-  // The remaining work to move a DistributedMesh
-  _is_serial = other_mesh.is_serial();
-  _is_serial_on_proc_0 = other_mesh.is_serial_on_zero();
-
-  _max_node_id = other_mesh.max_node_id();
-  _max_elem_id = other_mesh.max_elem_id();
-
-  _next_free_local_node_id = other_mesh._next_free_local_node_id;
-  _next_free_local_elem_id = other_mesh._next_free_local_elem_id;
-  _next_free_unpartitioned_node_id = other_mesh._next_free_unpartitioned_node_id;
-  _next_free_unpartitioned_elem_id = other_mesh._next_free_unpartitioned_elem_id;
-
-  #ifdef LIBMESH_ENABLE_UNIQUE_ID
-  _next_unpartitioned_unique_id = other_mesh._next_unpartitioned_unique_id;
-  #endif
+  // Nodes and elements belong to ReplicatedMesh and have to be
+  // moved before we can move arbitrary GhostingFunctor, Partitioner,
+  // etc. subclasses.
+  this->move_nodes_and_elements(std::move(other_mesh));
 
   _extra_ghost_elems = std::move(other_mesh._extra_ghost_elems);
+
+  // Handle remaining MeshBase moves.
+  this->post_dofobject_moves(std::move(other_mesh));
 
   return *this;
 }
@@ -218,13 +189,30 @@ DistributedMesh::DistributedMesh (const UnstructuredMesh & other_mesh) :
   this->update_parallel_id_counts();
 }
 
-void DistributedMesh::move_nodes_and_elements(MeshBase && other_mesh)
+void DistributedMesh::move_nodes_and_elements(MeshBase && other_meshbase)
 {
-  this->_nodes = std::move((cast_ptr<DistributedMesh*>(&other_mesh))->_nodes);
+  DistributedMesh & other_mesh = cast_ref<DistributedMesh&>(other_meshbase);
+
+  this->_nodes = std::move(other_mesh._nodes);
   this->_n_nodes = other_mesh.n_nodes();
 
-  this->_elements = std::move((cast_ptr<DistributedMesh*>(&other_mesh))->_elements);
+  this->_elements = std::move(other_mesh._elements);
   this->_n_elem = other_mesh.n_elem();
+
+  _is_serial = other_mesh.is_serial();
+  _is_serial_on_proc_0 = other_mesh.is_serial_on_zero();
+
+  _max_node_id = other_mesh.max_node_id();
+  _max_elem_id = other_mesh.max_elem_id();
+
+  _next_free_local_node_id = other_mesh._next_free_local_node_id;
+  _next_free_local_elem_id = other_mesh._next_free_local_elem_id;
+  _next_free_unpartitioned_node_id = other_mesh._next_free_unpartitioned_node_id;
+  _next_free_unpartitioned_elem_id = other_mesh._next_free_unpartitioned_elem_id;
+
+  #ifdef LIBMESH_ENABLE_UNIQUE_ID
+  _next_unpartitioned_unique_id = other_mesh._next_unpartitioned_unique_id;
+  #endif
 }
 
 // We use cached values for these so they can be called
