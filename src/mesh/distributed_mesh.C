@@ -58,46 +58,23 @@ DistributedMesh::DistributedMesh (const Parallel::Communicator & comm_in,
   _partitioner = libmesh_make_unique<ParmetisPartitioner>();
 }
 
-void DistributedMesh::assign (MeshBase & other_mesh)
+DistributedMesh & DistributedMesh::operator= (DistributedMesh && other_mesh)
 {
-  // First call the assign implementation of Unstructured::assign
-  this->UnstructuredMesh::assign(other_mesh);
+  // Move assign as an UnstructuredMesh.
+  this->UnstructuredMesh::operator=(std::move(other_mesh));
 
-  _is_serial = reinterpret_cast<DistributedMesh &>(other_mesh).is_serial();
-  _is_serial_on_proc_0 = reinterpret_cast<DistributedMesh &>(other_mesh).is_serial_on_zero();
+  // Nodes and elements belong to ReplicatedMesh and have to be
+  // moved before we can move arbitrary GhostingFunctor, Partitioner,
+  // etc. subclasses.
+  this->move_nodes_and_elements(std::move(other_mesh));
 
-  _n_nodes = reinterpret_cast<DistributedMesh &>(other_mesh).n_nodes();
-  _n_elem = reinterpret_cast<DistributedMesh &>(other_mesh).n_elem();
-  _max_node_id = reinterpret_cast<DistributedMesh &>(other_mesh).max_node_id();
-  _max_elem_id = reinterpret_cast<DistributedMesh &>(other_mesh).max_elem_id();
+  _extra_ghost_elems = std::move(other_mesh._extra_ghost_elems);
 
-  _next_free_local_node_id = reinterpret_cast<DistributedMesh &>(other_mesh)._next_free_local_node_id;
-  _next_free_local_elem_id = reinterpret_cast<DistributedMesh &>(other_mesh)._next_free_local_elem_id;
-  _next_free_unpartitioned_node_id = reinterpret_cast<DistributedMesh &>(other_mesh)._next_free_unpartitioned_node_id;
-  _next_free_unpartitioned_elem_id = reinterpret_cast<DistributedMesh &>(other_mesh)._next_free_unpartitioned_elem_id;
+  // Handle remaining MeshBase moves.
+  this->post_dofobject_moves(std::move(other_mesh));
 
-  #ifdef LIBMESH_ENABLE_UNIQUE_ID
-  _next_unpartitioned_unique_id = reinterpret_cast<DistributedMesh &>(other_mesh)._next_unpartitioned_unique_id;
-  #endif
-
-  // Loop over all elems in the other_mesh's set and set _extra_ghost_elems
-  // elementwise to the element with the same id in the new mesh
-  std::set<Elem *>::iterator it_other_mesh;
-  unsigned int elem_id;
-
-  // Begin loop over elements in the other mesh's set
-  for(it_other_mesh = reinterpret_cast<DistributedMesh &>(other_mesh)._extra_ghost_elems.begin(); it_other_mesh != reinterpret_cast<DistributedMesh &>(other_mesh)._extra_ghost_elems.end(); it_other_mesh++)
-  {
-    // Find the id corresponding to the current elem * in the set
-    elem_id = (*it_other_mesh)->id();
-
-    // Get the elem * corresponding to the above id in the new mesh
-    // and insert it in the _extra_ghost_elems member of the new mesh
-    _extra_ghost_elems.insert(_extra_ghost_elems.end(), this->elem_ptr(elem_id));
-  }
-  // End loop over elements in the other mesh
+  return *this;
 }
-
 
 DistributedMesh::~DistributedMesh ()
 {
@@ -212,6 +189,31 @@ DistributedMesh::DistributedMesh (const UnstructuredMesh & other_mesh) :
   this->update_parallel_id_counts();
 }
 
+void DistributedMesh::move_nodes_and_elements(MeshBase && other_meshbase)
+{
+  DistributedMesh & other_mesh = cast_ref<DistributedMesh&>(other_meshbase);
+
+  this->_nodes = std::move(other_mesh._nodes);
+  this->_n_nodes = other_mesh.n_nodes();
+
+  this->_elements = std::move(other_mesh._elements);
+  this->_n_elem = other_mesh.n_elem();
+
+  _is_serial = other_mesh.is_serial();
+  _is_serial_on_proc_0 = other_mesh.is_serial_on_zero();
+
+  _max_node_id = other_mesh.max_node_id();
+  _max_elem_id = other_mesh.max_elem_id();
+
+  _next_free_local_node_id = other_mesh._next_free_local_node_id;
+  _next_free_local_elem_id = other_mesh._next_free_local_elem_id;
+  _next_free_unpartitioned_node_id = other_mesh._next_free_unpartitioned_node_id;
+  _next_free_unpartitioned_elem_id = other_mesh._next_free_unpartitioned_elem_id;
+
+  #ifdef LIBMESH_ENABLE_UNIQUE_ID
+  _next_unpartitioned_unique_id = other_mesh._next_unpartitioned_unique_id;
+  #endif
+}
 
 // We use cached values for these so they can be called
 // from one processor without bothering the rest, but

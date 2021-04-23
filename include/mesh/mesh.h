@@ -82,7 +82,7 @@ public:
    * Copy and move assignment are not allowed.
    */
   Mesh & operator= (const Mesh &) = delete;
-  Mesh & operator= (Mesh &&) = delete;
+
 };
 
 

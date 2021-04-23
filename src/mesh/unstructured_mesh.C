@@ -123,7 +123,6 @@ void UnstructuredMesh::assign (MeshBase & other_mesh)
     _partitioner = (other_mesh.partitioner())->clone();
 }
 
-
 void UnstructuredMesh::copy_nodes_and_elements(const UnstructuredMesh & other_mesh,
                                                const bool skip_find_neighbors,
                                                dof_id_type element_id_offset,
