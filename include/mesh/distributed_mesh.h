@@ -110,12 +110,6 @@ public:
   { return libmesh_make_unique<DistributedMesh>(*this); }
 
   /**
-   * Assignment function, will move argument onto the MeshBase object.
-   * Definition in derived classes.
-   */
-  virtual void assign (MeshBase & other_mesh) override;
-
-  /**
    * Destructor.
    */
   virtual ~DistributedMesh();

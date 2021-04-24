@@ -82,12 +82,6 @@ public:
   virtual MeshBase & assign(MeshBase && other_mesh) override = 0;
 
   /**
-   * Assignment function, will move argument onto the MeshBase object.
-   * Definition in derived classes.
-   */
-  virtual void assign (MeshBase & other_mesh) override;
-
-  /**
    * Destructor.
    */
   virtual ~UnstructuredMesh();

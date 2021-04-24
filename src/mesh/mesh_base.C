@@ -1562,8 +1562,7 @@ MeshBase::merge_extra_integer_names(const MeshBase & other)
 
 
 
-void
-MeshBase::post_dofobject_moves(MeshBase && other_mesh)
+void MeshBase::post_dofobject_moves(MeshBase && other_mesh)
 {
   // Now that all the DofObject moving is done, we can move the GhostingFunctor objects
   // which include the _default_ghosting,_ghosting_functors and _shared_functors. We also need
