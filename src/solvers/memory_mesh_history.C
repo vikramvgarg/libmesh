@@ -230,7 +230,9 @@ void MemoryMeshHistory::retrieve(bool is_adjoint_solve, Real time)
     }
 
   // Move the mesh at this time instant to system.mesh and reinit to project solutions on to the new mesh
-  _system.get_mesh().assign(*(stored_meshes_it->second));
+  _system.get_mesh().clear();
+  _system.get_mesh().assign(std::move(*(stored_meshes_it->second)));
+  _system.get_equation_systems().reinit_mesh();
   _system.get_equation_systems().reinit();
 
   // We need to call update to put system in a consistent state

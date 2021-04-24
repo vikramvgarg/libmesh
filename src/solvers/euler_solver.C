@@ -261,9 +261,6 @@ void EulerSolver::integrate_adjoint_refinement_error_estimate(AdjointRefinementE
   if(_system.qoi_error_estimates.size() != _system.qoi.size())
     _system.qoi_error_estimates.resize(_system.qoi.size());
 
-  // There are two possibilities regarding the integration rule we need to use for time integration.
-  // If we have a instantaneous QoI, then we need to use a left sided Riemann sum, otherwise the trapezoidal rule for temporally smooth QoIs.
-
   // Create left and right error estimate vectors of the right size
   std::vector<Number> qoi_error_estimates_left(_system.qoi.size());
   std::vector<Number> qoi_error_estimates_right(_system.qoi.size());
