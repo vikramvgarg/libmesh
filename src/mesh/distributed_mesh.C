@@ -76,6 +76,13 @@ DistributedMesh & DistributedMesh::operator= (DistributedMesh && other_mesh)
   return *this;
 }
 
+MeshBase & DistributedMesh::assign(MeshBase && other_mesh)
+{
+  *this = std::move(*(cast_ptr<DistributedMesh*>(&other_mesh)));
+
+  return *this;
+}
+
 DistributedMesh::~DistributedMesh ()
 {
   this->clear();  // Free nodes and elements

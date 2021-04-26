@@ -78,7 +78,7 @@ public:
   DistributedMesh(DistributedMesh &&) = delete;
 
   /**
-   * Copy and move assignment are not allowed.
+   * Copy assignment is not allowed.
    */
   DistributedMesh & operator= (const DistributedMesh &) = delete;
 
@@ -91,15 +91,10 @@ public:
   /**
    * Shim to call the move assignment operator for this class
   */
-  virtual MeshBase & assign(MeshBase && other_mesh) override
-  {
-    *this = std::move(*(cast_ptr<DistributedMesh*>(&other_mesh)));
-
-    return *this;
-  }
+  virtual MeshBase & assign(MeshBase && other_mesh) override;
 
   /**
-   * Move node and elements from other_mesh to this mesh.
+   * Move node and elements from a DistributedMesh.
    */
   virtual void move_nodes_and_elements(MeshBase && other_mesh) override;
 
