@@ -289,7 +289,7 @@ public:
   /**
    * Reinitializes the system with a new mesh.
    */
-  void reinit_mesh();
+  virtual void reinit_mesh();
 
   /**
    * \returns \p true iff this system has been initialized.
