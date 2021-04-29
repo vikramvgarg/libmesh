@@ -79,9 +79,15 @@ public:
   Mesh(Mesh &&) = delete;
 
   /**
-   * Copy and move assignment are not allowed.
+   * Copy assignment is not allowed.
    */
   Mesh & operator= (const Mesh &) = delete;
+
+  /**
+   * Move assignment is allowed but mesh objects
+   * should be moved using the MeshBase::assign function.
+   */
+  Mesh & operator= (Mesh &&) = default;
 
 };
 
