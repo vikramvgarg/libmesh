@@ -84,8 +84,7 @@ public:
   Mesh & operator= (const Mesh &) = delete;
 
   /**
-   * Move assignment is allowed but mesh objects
-   * should be moved using the MeshBase::assign function.
+   * Move assignment is allowed.
    */
   Mesh & operator= (Mesh &&) = default;
 
