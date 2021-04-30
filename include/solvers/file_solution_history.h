@@ -93,7 +93,7 @@ public:
    * This function takes two unsigned ints as argument, to indicate the number of
    * h and p refinements that should be performed on the read in mesh.
    */
-  virtual void activate_mesh_history(unsigned int number_h_refinements = 0, unsigned int number_p_refinements = 0) override;
+  virtual void activate_mesh_history() override;
 
 private:
 
@@ -129,23 +129,6 @@ private:
    * A vector of pointers to vectors holding the adjoint solution at the last time step
    */
   std::vector< std::unique_ptr<NumericVector<Number>> > dual_solution_copies;
-
-  /**
-   * If a mesh_history is active, we need to know how many h and/or p refinements we want
-   * for the adjoint calculation. These will be carried out on the mesh read in via mesh_history.
-   * The defaults are zero for both parameters, meaning we will not be enriching the grid for
-   * a corresponding adjoint timestep.
-   */
-  unsigned int _number_h_refinements;
-  unsigned int _number_p_refinements;
-
-  // /**
-  //  * A mesh reference so we can preserve the existing system mesh (say M1) while reading in the new
-  //  * mesh from file. This allows us to preserve existing adjoint solutions (which may have
-  //  * been computed on a finer mesh) and continue the adjoint loop with M1 once the mesh and solution
-  //  * have been read from file.
-  //  */
-  // MeshBase & _current_mesh;
 
 };
 

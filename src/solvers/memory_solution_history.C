@@ -53,13 +53,10 @@ MemorySolutionHistory::MemorySolutionHistory(System & system_)
 /**
  * Makes the base class mesh_history a MemoryMeshHistory object.
  */
-void MemorySolutionHistory::activate_mesh_history(unsigned int number_h_refinements, unsigned int number_p_refinements)
+void MemorySolutionHistory::activate_mesh_history()
 {
   MemoryMeshHistory system_memory_mesh_history(_system);
   mesh_history = system_memory_mesh_history.clone();
-
-  _number_h_refinements = number_h_refinements;
-  _number_p_refinements = number_p_refinements;
 }
 
 // This function finds, if it can, the entry where we're supposed to
@@ -276,41 +273,11 @@ void MemorySolutionHistory::retrieve(bool is_adjoint_solve, Real time)
     // If we have a mesh_history, retrieve the mesh first, reinit is done by mesh_history
     mesh_history->retrieve(is_adjoint_solve, time);
 
-    // Refine the read in mesh if needed and project the read in solutions on to the refined mesh.
-    MeshBase & _system_mesh = _system.get_mesh();
-    auto mesh_refinement = libmesh_make_unique<MeshRefinement>(_system_mesh);
-
-    for (unsigned int i = 0; i != _number_h_refinements; ++i)
-    {
-      mesh_refinement->uniformly_refine(1);
-      _system.get_equation_systems().reinit();
-    }
-
-    for (unsigned int i = 0; i != _number_p_refinements; ++i)
-    {
-      mesh_refinement->uniformly_p_refine(1);
-      _system.get_equation_systems().reinit();
-    }
-
     // Reading in the primal solution xdas overwrites the adjoint solution with zero
     // So swap to retain the old adjoint solution
     for (auto j : make_range(_system.n_qois()))
     {
       dual_solution_copies[j] = _system.get_adjoint_solution(j).clone();
-    }
-
-    // Before we read in the stored primal solution, we will need to restore the mesh to
-    // correspond to the primal solution
-    for (unsigned int i = 0; i != _number_h_refinements; ++i)
-    {
-      mesh_refinement->uniformly_coarsen(1);
-      _system.get_equation_systems().reinit();
-    }
-
-    for (unsigned int i = 0; i != _number_p_refinements; ++i)
-    {
-      mesh_refinement->uniformly_p_coarsen(1);
-      _system.get_equation_systems().reinit();
     }
 
   }
@@ -340,23 +307,6 @@ void MemorySolutionHistory::retrieve(bool is_adjoint_solve, Real time)
   // If in the adjoint solve, refine, project and restore as needed
   if(is_adjoint_solve)
   {
-    // Refine the read in mesh if needed and project the read in solutions on to the refined mesh.
-    MeshBase & _system_mesh = _system.get_mesh();
-    auto mesh_refinement = libmesh_make_unique<MeshRefinement>(_system_mesh);
-
-    // Now, refine again and project
-    for (unsigned int i = 0; i != _number_h_refinements; ++i)
-    {
-      mesh_refinement->uniformly_refine(1);
-      _system.get_equation_systems().reinit();
-    }
-
-    for (unsigned int i = 0; i != _number_p_refinements; ++i)
-    {
-      mesh_refinement->uniformly_p_refine(1);
-      _system.get_equation_systems().reinit();
-    }
-
     // Swap back the copy of the last adjoint solution back in place
     for (auto j : make_range(_system.n_qois()))
     {

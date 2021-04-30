@@ -74,7 +74,7 @@ public:
    * The mesh_history object owned by the base SH class is initialized
    * to a NoMeshHistory, so no need to do anything here
    */
-  virtual void activate_mesh_history(unsigned int /*number_h_refinements*/, unsigned int /*number_p_refinements*/) override
+  virtual void activate_mesh_history() override
   {
     // Do nothing
   }
