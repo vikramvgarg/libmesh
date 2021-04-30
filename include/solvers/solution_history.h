@@ -85,7 +85,7 @@ public:
    * It is necessary to save the mesh, if we plan to do uniform
    * or adaptive mesh refinement in the time integration loop.
    */
-  virtual void activate_mesh_history(unsigned int number_h_refinements = 0, unsigned int number_p_refinements = 0) = 0;
+  virtual void activate_mesh_history() = 0;
 
 protected:
 

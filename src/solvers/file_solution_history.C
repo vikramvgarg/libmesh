@@ -58,13 +58,10 @@ FileSolutionHistory::~FileSolutionHistory ()
 /**
  * Makes the base class mesh_history a FileMeshHistory object.
  */
-void FileSolutionHistory::activate_mesh_history(unsigned int number_h_refinements, unsigned int number_p_refinements)
+void FileSolutionHistory::activate_mesh_history()
 {
   FileMeshHistory system_file_mesh_history(_system);
   mesh_history = system_file_mesh_history.clone();
-
-  _number_h_refinements = number_h_refinements;
-  _number_p_refinements = number_p_refinements;
 }
 
 // This function finds, if it can, the entry where we're supposed to
@@ -309,22 +306,6 @@ void FileSolutionHistory::retrieve(bool is_adjoint_solve, Real time)
     // If we have a mesh_history, retrieve the mesh first, reinit is done by mesh_history
     mesh_history->retrieve(is_adjoint_solve, time);
 
-    // Refine the read in mesh if needed and project the read in solutions on to the refined mesh.
-    MeshBase & _system_mesh = _system.get_mesh();
-    auto mesh_refinement = libmesh_make_unique<MeshRefinement>(_system_mesh);
-
-    for (unsigned int i = 0; i != _number_h_refinements; ++i)
-    {
-      mesh_refinement->uniformly_refine(1);
-      _system.get_equation_systems().reinit();
-    }
-
-    for (unsigned int i = 0; i != _number_p_refinements; ++i)
-    {
-      mesh_refinement->uniformly_p_refine(1);
-      _system.get_equation_systems().reinit();
-    }
-
     // Reading in the primal solution xdas overwrites the adjoint solution with zero
     // So swap to retain the old adjoint solution
     for (auto j : make_range(_system.n_qois()))
@@ -332,35 +313,8 @@ void FileSolutionHistory::retrieve(bool is_adjoint_solve, Real time)
       dual_solution_copies[j] = _system.get_adjoint_solution(j).clone();
     }
 
-    // Before we read in the stored primal solution, we will need to restore the mesh to
-    // correspond to the primal solution
-    for (unsigned int i = 0; i != _number_h_refinements; ++i)
-    {
-      mesh_refinement->uniformly_coarsen(1);
-      _system.get_equation_systems().reinit();
-    }
-
-    for (unsigned int i = 0; i != _number_p_refinements; ++i)
-    {
-      mesh_refinement->uniformly_p_coarsen(1);
-      _system.get_equation_systems().reinit();
-    }
-
     // Read in the primal solution stored at the current recovery time from the disk
     _system.get_equation_systems().read (stored_sols->second, READ, EquationSystems::READ_DATA | EquationSystems::READ_ADDITIONAL_DATA);
-
-    // Now, refine again and project
-    for (unsigned int i = 0; i != _number_h_refinements; ++i)
-    {
-      mesh_refinement->uniformly_refine(1);
-      _system.get_equation_systems().reinit();
-    }
-
-    for (unsigned int i = 0; i != _number_p_refinements; ++i)
-    {
-      mesh_refinement->uniformly_p_refine(1);
-      _system.get_equation_systems().reinit();
-    }
 
     // Swap back the copy of the last adjoint solution back in place
     for (auto j : make_range(_system.n_qois()))
@@ -368,29 +322,6 @@ void FileSolutionHistory::retrieve(bool is_adjoint_solve, Real time)
       (_system.get_adjoint_solution(j)).swap(*dual_solution_copies[j]);
     }
 
-    // // We stored the primal solution on a coarse mesh, so we need to coarsen the
-    // // current refined mesh before reading it in.
-    // // Back up of the fine mesh adjoint solution should already be handled via dual_solution_copies above
-    // // Get a reference to the mesh object associated with the system
-    // MeshBase & _system_mesh = _system.get_mesh();
-    // // Make a mesh refinement object
-    // auto mesh_refinement = libmesh_make_unique<MeshRefinement>(_system_mesh);
-    // // Coarsen the mesh
-    // mesh_refinement->uniformly_coarsen(1);
-    // _system.get_equation_systems().reinit();
-
-    // // Read in the primal solution stored at the current recovery time from the disk
-    // _system.get_equation_systems().read (stored_sols->second, READ, EquationSystems::READ_DATA | EquationSystems::READ_ADDITIONAL_DATA);
-
-    // // Refine the mesh and project the read in solution
-    // mesh_refinement->uniformly_refine(1);
-    // _system.get_equation_systems().reinit();
-
-    // // Swap back the copy of the last adjoint solution back in place
-    // for (auto j : make_range(_system.n_qois()))
-    // {
-    //   (_system.get_adjoint_solution(j)).swap(*dual_solution_copies[j]);
-    // }
   }
   else
   {
