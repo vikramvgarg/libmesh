@@ -50,6 +50,7 @@ public:
    * Destructor.
    */
   ~BoundaryMesh();
+
 };
 
 } // namespace libMesh
