@@ -23,8 +23,10 @@
 #include "libmesh/diff_system.h"
 // For the MeshRefinement Object
 #include "libmesh/mesh_base.h"
-#include "libmesh/mesh_refinement.h"
+#include "libmesh/mesh.h"
+#include "libmesh/inter_mesh_projection.h"
 #include "libmesh/equation_systems.h"
+#include "libmesh/enum_norm_type.h"
 
 #include <cmath>
 #include <iterator>
@@ -265,14 +267,70 @@ void FileMeshHistory::retrieve(bool is_adjoint_solve, Real time)
       return;
     }
 
-    // Read in the mesh at this time instant and reinit to project solutions on to the new mesh
+    Real T_H1 = _system.calculate_norm(*_system.solution, 0, H1);
+    Real T_L2 = _system.calculate_norm(*_system.solution, 0, L2);
+
+    std::cout << "T_mesh(H1) = " << T_H1 << std::endl << "T_mesh(L2) = " << T_L2 << std::endl;
+
+    // Read in the mesh to be retrieved into a temp_mesh
+    Mesh temp_mesh(_system.get_mesh().comm(), _system.get_mesh().mesh_dimension());
+    temp_mesh.read(stored_meshes_it->second);
+
+    // Create a temp_system to inter mesh project the solution and system vectors
+    // of _system.mesh onto temp_mesh
+    EquationSystems temp_mesh_equation_system(temp_mesh);
+    System & temp_mesh_system = temp_mesh_equation_system.add_system<System>("temp_system");
+
+    // Add all _system variables to temp_mesh_system
+    for ( auto i : make_range(_system.n_vars()) )
+      temp_mesh_system.add_variable(_system.variable_name(i), _system.variable(i).type().order, _system.variable(i).type().family);
+
+    temp_mesh_equation_system.init();
+
+    // Add all _system vectors to temp_mesh_system
+    for ( System::vectors_iterator vec = _system.vectors_begin(), vec_end = _system.vectors_end(); vec != vec_end; ++vec )
+     temp_mesh_system.add_vector(vec->first, temp_mesh_system.vector_preservation(vec->first), (vec->second)->type());
+
+    // Create an IMP object to project from _system to temp_mesh_system
+    InterMeshProjection inter_mesh_projector(_system, temp_mesh_system);
+
+    inter_mesh_projector.project_system_vectors();
+
+    Real T_H1_temp_mesh = temp_mesh_system.calculate_norm(*temp_mesh_system.solution, 0, H1);
+    Real T_L2_temp_mesh = temp_mesh_system.calculate_norm(*temp_mesh_system.solution, 0, L2);
+
+    std::cout << "T_temp_mesh(H1) = " << T_H1_temp_mesh << std::endl << "T_temp_mesh(L2) = " << T_L2_temp_mesh << std::endl;
+
+    // Reassign _system.mesh and reinit _system's ES with this new mesh
     _system.get_mesh().clear();
-    _system.get_mesh().read(stored_meshes_it->second);
-    _system.get_equation_systems().reinit();
+    _system.get_mesh().assign(std::move(temp_mesh));
+    _system.get_equation_systems().reinit_mesh();
+
+    // Get a pointer to the primal solution vector
+    NumericVector<Number> & primal_solution = *_system.solution;
+
+    // Replace the vectors in _system with those from destination_system
+    *_system.solution = *temp_mesh_system.solution;
+
+    primal_solution = *_system.solution;
+
+    // Match vectors as well
+    for (System::vectors_iterator vec = _system.vectors_begin(), vec_end = _system.vectors_end(); vec != vec_end; ++vec)
+    {
+      // The name of this vector
+      const std::string & vec_name = vec->first;
+
+      _system.get_vector(vec_name) = temp_mesh_system.get_vector(vec_name);
+    }
 
     // We need to call update to put system in a consistent state
     // with the mesh that was read in
     _system.update();
+
+    Real T_H1_assign_mesh = _system.calculate_norm(*_system.solution, 0, H1);
+    Real T_L2_assign_mesh = _system.calculate_norm(*_system.solution, 0, L2);
+
+    std::cout << "T_assign_mesh(H1) = " << T_H1_assign_mesh << std::endl << "T_assign_mesh(L2) = " << T_L2_assign_mesh << std::endl;
 
 }
 
